@@ -32,6 +32,7 @@ import {
 
 const CLAVE_PALLET_ABIERTO = 'registro-pallets.pallet-abierto';
 const CLAVE_RESPONSABLE = 'registro-pallets.responsable';
+const CLAVE_RECHAZADOS = 'registro-pallets.pallets-rechazados';
 const DURACION_VERDE_MS = 1200;
 const DIAS_DE_MARGEN_EN_LA_FECHA = 31;
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
@@ -110,6 +111,9 @@ const sumarUnidades = (items) => items.reduce((suma, item) => suma + item.unidad
 const numeroLibre = () => Math.max(0, ...palletsDeLaFecha.map((p) => p.numero)) + 1;
 
 const numeroOcupado = (numero) => palletsDeLaFecha.some((p) => p.numero === numero);
+
+// Otro dispositivo pudo haber cerrado un pallet con este número mientras se armaba este.
+const numeroParaCerrar = () => (numeroOcupado(pallet.numero) ? numeroLibre() : pallet.numero);
 
 function completarNumeroAutomatico() {
   if (!pallet && !numeroEscritoAMano) campoNumero.value = numeroLibre();
@@ -312,16 +316,41 @@ function terminarPallet() {
   if (camaraEncendida) apagarLaCamara();
   prepararApertura();
   pintarPantalla();
+  devolverPalletRechazado();
+}
+
+const leerRechazados = () => JSON.parse(localStorage.getItem(CLAVE_RECHAZADOS) ?? '[]');
+
+function guardarRechazados(lista) {
+  localStorage.setItem(CLAVE_RECHAZADOS, JSON.stringify(lista));
+}
+
+// Un pallet que la base rechazó espera acá hasta que la pantalla esté libre. Nunca se mezcla
+// con las cajas del pallet que se esté armando.
+function devolverPalletRechazado() {
+  const [rechazado, ...resto] = leerRechazados();
+  if (pallet || !rechazado) return;
+  guardarRechazados(resto);
+  pallet = rechazado;
+  guardarPalletAbierto();
+  escucharPalletsDe(pallet.fecha);
+  pintarPantalla();
+  mostrarEnTablero('espera', 'Este pallet no se guardó', 'Cerralo de nuevo cuando esté resuelto.');
+  enfocarLector();
 }
 
 async function cerrarPallet() {
   const items = agruparPorProducto(pallet.lecturas);
   const totalCajas = pallet.lecturas.length;
   const totalUnidades = sumarUnidades(items);
+  const numeroPrevisto = numeroParaCerrar();
+  const cambioElNumero = numeroPrevisto === pallet.numero
+    ? ''
+    : ` El ${pallet.numero} ya lo usó otro dispositivo.`;
 
   const guardar = await confirmar({
-    titulo: `Resumen del pallet ${pallet.numero}`,
-    detalle: `${fechaParaMostrar(pallet.fecha)}. Responsable: ${pallet.responsable}.`,
+    titulo: `Resumen del pallet ${numeroPrevisto}`,
+    detalle: `${fechaParaMostrar(pallet.fecha)}. Responsable: ${pallet.responsable}.${cambioElNumero}`,
     contenido: crear('div', {},
       tablaDeItems(items),
       crear('p', { class: 'resumen-total' }, `Total: ${cajas(totalCajas)} y ${unidades(totalUnidades)}`)),
@@ -344,12 +373,10 @@ async function cerrarPallet() {
     items,
   }).catch((error) => {
     // Si Firebase lo rechaza, las cajas vuelven a la pantalla en vez de perderse.
-    if (pallet) pallet.lecturas.unshift(...palletCerrado.lecturas);
-    else pallet = palletCerrado;
-    guardarPalletAbierto();
-    pintarPantalla();
-    enfocarLector();
-    avisar(`El pallet ${numero} no se guardó y sus cajas volvieron a la pantalla. ${motivoDelError(error)}`, 'error');
+    guardarRechazados([...leerRechazados(), palletCerrado]);
+    const cuando = pallet ? 'van a volver cuando termines este pallet' : 'volvieron a la pantalla';
+    devolverPalletRechazado();
+    avisar(`El pallet ${numero} no se guardó y sus cajas ${cuando}. ${motivoDelError(error)}`, 'error');
   });
 
   terminarPallet();
@@ -461,6 +488,7 @@ export function iniciarPantallaEscaneo() {
   if (pallet) escucharPalletsDe(pallet.fecha);
   else prepararApertura();
   pintarPantalla();
+  devolverPalletRechazado();
   enfocarLector();
 
   formularioApertura.addEventListener('submit', abrirPallet);

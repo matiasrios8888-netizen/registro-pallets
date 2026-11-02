@@ -9,6 +9,13 @@
       "firestore.rules",
       "README.md",
       "CLAUDE.md",
+      "capacitor.config.json",
+      "package.json",
+      "package-lock.json",
+      "android/**",
+      "node_modules/**",
+      "scripts/**",
+      "www/**",
       "**/.*",
       "**/.*/**"
     ]

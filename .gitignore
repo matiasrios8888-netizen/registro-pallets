@@ -8,3 +8,6 @@ www/
 *.apk
 *.keystore
 *.jks
+
+# Resultado de la prueba del APK
+capturas/

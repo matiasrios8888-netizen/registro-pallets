@@ -1,0 +1,21 @@
+{
+  "name": "registro-pallets",
+  "version": "1.0.0",
+  "description": "Registro de pallets por escaneo de cajas",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "preparar": "node scripts/preparar-www.mjs",
+    "sincronizar": "npm run preparar && npx cap sync android",
+    "apk": "npm run sincronizar && cd android && gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/share": "^8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.0"
+  }
+}

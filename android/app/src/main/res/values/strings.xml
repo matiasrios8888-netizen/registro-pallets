@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Registro de pallets</string>
+    <string name="title_activity_main">Registro de pallets</string>
+    <string name="package_name">com.registropallets.app</string>
+    <string name="custom_url_scheme">com.registropallets.app</string>
+</resources>

@@ -34,6 +34,7 @@ const CLAVE_PALLET_ABIERTO = 'registro-pallets.pallet-abierto';
 const CLAVE_RESPONSABLE = 'registro-pallets.responsable';
 const CLAVE_RECHAZADOS = 'registro-pallets.pallets-rechazados';
 const DURACION_VERDE_MS = 1200;
+const ESPERA_ENTRE_QUITAS_MS = 400;
 const DIAS_DE_MARGEN_EN_LA_FECHA = 31;
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
@@ -46,6 +47,7 @@ let visible = true;
 let camaraEncendida = false;
 let codigoDesconocido = null;
 let temporizadorVerde;
+let ultimaQuita = 0;
 let anchoDeLaCamara = 0;
 
 // Pallets ya cerrados en la fecha elegida: para saber qué número le toca al siguiente.
@@ -70,6 +72,7 @@ const datosTablero = document.getElementById('tablero-datos');
 const contador = document.getElementById('contador');
 const contadorApagado = document.getElementById('contador-apagado');
 const totalDeUnidades = document.getElementById('total-unidades');
+const etiquetaCajas = document.getElementById('etiqueta-cajas');
 const lecturaTitulo = document.getElementById('lectura-titulo');
 const lecturaDetalle = document.getElementById('lectura-detalle');
 const botonAgregarCodigo = document.getElementById('btn-agregar-codigo');
@@ -227,7 +230,9 @@ function pintarPantalla() {
   datosTablero.textContent = `${fechaParaMostrar(pallet.fecha)}, ${pallet.responsable}`;
   contador.textContent = totalCajas;
   contadorApagado.textContent = '8'.repeat(Math.max(3, String(totalCajas).length));
+  contador.parentElement.classList.toggle('contador-largo', totalCajas > 999);
   totalDeUnidades.textContent = unidades(sumarUnidades(items));
+  etiquetaCajas.textContent = totalCajas === 1 ? 'caja' : 'cajas';
   listaItems.replaceChildren(...items.map(filaItem));
   botonCerrar.disabled = totalCajas === 0;
   botonDeshacer.disabled = totalCajas === 0;
@@ -246,6 +251,9 @@ function mostrarEnTablero(estado, titulo, detalle = '') {
   tablero.dataset.estado = 'espera';
   void tablero.offsetWidth;
   tablero.dataset.estado = estado;
+
+  // Con la lista larga el tablero puede haber quedado arriba, fuera de la pantalla.
+  if (estado !== 'espera') tablero.scrollIntoView({ block: 'nearest' });
 
   if (estado === 'ok') {
     temporizadorVerde = setTimeout(() => {
@@ -292,7 +300,16 @@ function procesarCodigo(textoLeido) {
   senalOk();
 }
 
+// Un doble toque sin querer no debe sacar dos cajas.
+function esToqueRepetido() {
+  const ahora = performance.now();
+  const repetido = ahora - ultimaQuita < ESPERA_ENTRE_QUITAS_MS;
+  ultimaQuita = ahora;
+  return repetido;
+}
+
 function deshacerUltimoEscaneo() {
+  if (esToqueRepetido()) return;
   const lectura = pallet.lecturas.pop();
   if (!lectura) return;
   guardarPalletAbierto();
@@ -301,6 +318,7 @@ function deshacerUltimoEscaneo() {
 }
 
 function quitarUnaCaja(item) {
+  if (esToqueRepetido()) return;
   const clave = claveDeFila(item);
   pallet.lecturas.splice(pallet.lecturas.findLastIndex((l) => claveDeFila(l) === clave), 1);
   guardarPalletAbierto();
@@ -388,7 +406,7 @@ async function descartarPallet() {
   if (total > 0) {
     const descartar = await confirmar({
       titulo: '¿Descartar este pallet?',
-      detalle: `Se borran las ${cajas(total)} escaneadas y no queda registro.`,
+      detalle: `${total === 1 ? 'Se borra la caja escaneada' : `Se borran las ${cajas(total)} escaneadas`} y no queda registro.`,
       si: 'Descartar pallet',
       no: 'Seguir escaneando',
       peligro: true,
@@ -488,6 +506,7 @@ export function iniciarPantallaEscaneo() {
   if (pallet) escucharPalletsDe(pallet.fecha);
   else prepararApertura();
   pintarPantalla();
+  if (pallet?.lecturas.length) mostrarEnTablero('espera', 'Escaneá la siguiente caja');
   devolverPalletRechazado();
   enfocarLector();
 

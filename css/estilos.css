@@ -282,6 +282,10 @@ h2 {
   text-align: right;
 }
 
+.contador-largo {
+  font-size: min(24cqw, 190px);
+}
+
 .contador-apagado {
   position: absolute;
   inset: 0;

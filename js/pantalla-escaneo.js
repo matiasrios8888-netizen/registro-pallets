@@ -528,7 +528,8 @@ async function encenderLaCamara() {
     camaraEncendida = true;
     anchoDeLaCamara = document.documentElement.clientWidth;
     botonCamara.textContent = 'Apagar cámara';
-    marcoCamara.scrollIntoView({ block: 'nearest' });
+    // El botón está más abajo: sin esto, el contador queda fuera de la pantalla mientras se apunta.
+    tablero.scrollIntoView({ block: 'start' });
   } catch (error) {
     console.error(error);
     marcoCamara.hidden = true;

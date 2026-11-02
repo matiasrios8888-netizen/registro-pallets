@@ -119,6 +119,14 @@ const numeroOcupado = (numero) => palletsDeLaFecha.some((p) => p.numero === nume
 // Otro dispositivo pudo haber cerrado un pallet con este número mientras se armaba este.
 const numeroParaCerrar = () => (numeroOcupado(pallet.numero) ? numeroLibre() : pallet.numero);
 
+function mostrarEstadoDelPallet() {
+  if (pallet.devuelto) {
+    mostrarEnTablero('error', 'Este pallet no se guardó', 'Cerralo de nuevo cuando esté resuelto.');
+  } else {
+    mostrarEnTablero('espera', pallet.lecturas.length ? 'Escaneá la siguiente caja' : 'Escaneá la primera caja');
+  }
+}
+
 function completarNumeroAutomatico() {
   if (!pallet && !numeroEscritoAMano) campoNumero.value = numeroLibre();
 }
@@ -198,7 +206,7 @@ function abrirPallet(evento) {
   guardarPalletAbierto();
   mensajeApertura.hidden = true;
   pintarPantalla();
-  mostrarEnTablero('espera', 'Escaneá la primera caja');
+  mostrarEstadoDelPallet();
   enfocarLector();
   window.scrollTo(0, 0);
 }
@@ -503,6 +511,8 @@ async function reiniciarCamaraSiCambioElAncho() {
 function alCambiarEnOtraPestana(evento) {
   if (evento.key !== CLAVE_PALLET_ABIERTO) return;
   pallet = JSON.parse(evento.newValue ?? 'null');
+  // Una pregunta abierta se armó con el pallet de antes: contestarla ahora actuaría sobre otro.
+  document.getElementById('dialogo-confirmar').close();
   if (pallet) {
     escucharPalletsDe(pallet.fecha);
   } else {
@@ -511,6 +521,7 @@ function alCambiarEnOtraPestana(evento) {
     prepararApertura();
   }
   pintarPantalla();
+  if (pallet) mostrarEstadoDelPallet();
   enfocarLector();
 }
 
@@ -518,7 +529,7 @@ export function iniciarPantallaEscaneo() {
   if (pallet) escucharPalletsDe(pallet.fecha);
   else prepararApertura();
   pintarPantalla();
-  if (pallet?.lecturas.length) mostrarEnTablero('espera', 'Escaneá la siguiente caja');
+  if (pallet) mostrarEstadoDelPallet();
   if (pallet?.lecturas.length) recordarCajaVista(pallet.lecturas.at(-1).codigoInterno);
   devolverPalletRechazado();
   enfocarLector();

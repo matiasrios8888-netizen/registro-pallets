@@ -38,9 +38,12 @@
   display: none !important;
 }
 
-/* La barra de abajo es fija: lo que el navegador lleva a la vista tiene que quedar arriba de ella. */
-html {
-  scroll-padding-bottom: 100px;
+/* La barra de abajo es fija: lo que el navegador lleva a la vista tiene que quedar arriba de ella.
+   En un celular apaisado no: ese espacio dejaría el contador afuera. */
+@media (max-width: 899px) and (min-height: 501px) {
+  html {
+    scroll-padding-bottom: 100px;
+  }
 }
 
 body {
@@ -401,6 +404,17 @@ h2 {
   padding-inline: 8px;
 }
 
+/* En los celulares más angostos un código de 13 cifras no entraría. */
+@media (max-width: 359px) {
+  #campo-lector {
+    font-size: 20px;
+  }
+
+  .campo-con-boton .boton {
+    padding-inline: 10px;
+  }
+}
+
 /* Campos de formulario */
 input {
   width: 100%;
@@ -540,6 +554,13 @@ input {
   font-size: 24px;
 }
 
+/* El código se puede partir si es muy largo, pero uno normal entra entero. */
+@media (min-width: 601px) {
+  .tabla-items td.codigo {
+    min-width: 88px;
+  }
+}
+
 .tabla-items .numero {
   padding-right: 0;
   padding-left: 10px;
@@ -564,7 +585,7 @@ input {
 
   .tabla-items tr {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 60px 116px;
+    grid-template-columns: minmax(0, 1fr) 60px minmax(116px, max-content);
   }
 
   .tabla-items th:nth-child(2) {
@@ -590,6 +611,7 @@ input {
   position: sticky;
   bottom: 0;
   margin-bottom: 0;
+  padding-bottom: 14px;
   background: var(--chapa);
   font-family: var(--letra-angosta);
   font-size: 28px;
@@ -620,7 +642,7 @@ input {
 /* La fila de cada pallet se toca para ver u ocultar su detalle. */
 .pallet-cabecera {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(96px, 1fr) auto;
   gap: 2px 12px;
   align-items: baseline;
   padding: 14px;
@@ -631,6 +653,10 @@ input {
 
 .pallet-cabecera::-webkit-details-marker {
   display: none;
+}
+
+.pallet-cabecera .dato-suave {
+  overflow-wrap: anywhere;
 }
 
 .pallet-total {

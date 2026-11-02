@@ -36,6 +36,7 @@ const CLAVE_RESPONSABLE = 'registro-pallets.responsable';
 const CLAVE_RECHAZADOS = 'registro-pallets.pallets-rechazados';
 const DURACION_VERDE_MS = 1200;
 const ESPERA_ENTRE_QUITAS_MS = 400;
+const ALTO_BARRA_INFERIOR = 100;
 const DIAS_DE_MARGEN_EN_LA_FECHA = 31;
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
@@ -269,8 +270,10 @@ function mostrarEnTablero(estado, titulo, detalle = '') {
   void tablero.offsetWidth;
   tablero.dataset.estado = estado;
 
-  // Con la lista larga el tablero puede haber quedado arriba, fuera de la pantalla.
-  if (estado !== 'espera') tablero.scrollIntoView({ block: 'nearest' });
+  // Con la lista larga el tablero puede haber quedado arriba, fuera de la pantalla. Si no
+  // entra entero, como en un celular apaisado, moverlo solo haría saltar la pantalla.
+  const entraEnPantalla = tablero.offsetHeight <= window.innerHeight - ALTO_BARRA_INFERIOR;
+  if (estado !== 'espera' && entraEnPantalla) tablero.scrollIntoView({ block: 'nearest' });
 
   if (estado === 'ok') {
     temporizadorVerde = setTimeout(() => {

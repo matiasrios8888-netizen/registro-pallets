@@ -51,7 +51,7 @@ Para cortar el servidor, apretá `Ctrl + C` en la terminal.
 
 ## Averiguar qué trae el código de barras de las cajas
 
-Abrí un pallet y escaneá una caja real. Va a aparecer en rojo "código desconocido" con el texto exacto que leyó.
+Abrí un pallet y escaneá una caja real. Va a aparecer en rojo "código desconocido" con el código que leyó, en mayúsculas.
 
 - Si dice algo como `KD0324`, el código de barras trae el código interno.
 - Si son 13 números, es un EAN.
@@ -90,7 +90,7 @@ firebase deploy --project TU-PROJECT-ID
 
 Si la primera vez dice que no encuentra el sitio, entrá a **Hosting** en la consola de Firebase, tocá **Comenzar** y volvé a correr el último comando.
 
-Queda publicada en `https://TU-PROJECT-ID.web.app`. Cada vez que cambies algo, corré `firebase deploy` de nuevo.
+Queda publicada en `https://TU-PROJECT-ID.web.app`. Cada vez que cambies algo, corré ese mismo comando de nuevo.
 
 **6. Cargar los productos.** La base arranca vacía: entrá a **Productos** y tocá **Cargar productos de prueba**.
 
@@ -103,16 +103,22 @@ La pistola Bluetooth no necesita `https`. Vinculala desde el Bluetooth del celul
 ## Cómo se comporta
 
 - **Foco:** el campo de la pistola recupera el cursor solo. Si la etiqueta dice en rojo "Tocá acá para volver a leer", la app no es la ventana activa y la pistola estaría escribiendo en otro programa.
+- **Lecturas fuera de lugar:** en Historial, en Productos o antes de abrir el pallet, una lectura no suma nada. Suena la alerta y un aviso dice que no se contó.
 - **Teclado del celular:** ese campo no abre el teclado de pantalla, para que no tape el tablero. Para escribir un código, tocá **Escribir a mano**.
-- **Antes de abrir el pallet:** una lectura no suma nada y su Enter no abre el pallet. Solo se abre tocando el botón.
+- **Abrir pallet:** solo se abre tocando el botón, nunca con Enter. El número va de 1 a 9999 y la fecha puede estar hasta 31 días antes o después de hoy. El responsable no acepta 4 cifras seguidas. Esos controles frenan una lectura que cayó en el campo equivocado.
+- **Agregar o editar producto:** solo se guarda tocando el botón. Unidades por caja llega hasta 100.000.
 - **Sin señal:** con la app ya abierta se puede seguir escaneando y cerrando pallets. Se suben solos cuando vuelve la conexión. Para abrir la app de cero sí hace falta internet.
 - **Pallet a medio armar:** queda guardado en el dispositivo a cada lectura. Si se recarga la página o se apaga el celular, sigue ahí.
-- **Numeración:** cada fecha arranca en 1. El número se elige al abrir y no se puede repetir en la misma fecha. Si otro dispositivo cerró ese número mientras tanto, al cerrar se guarda con el siguiente libre y el aviso muestra cuál quedó. Sin señal los dispositivos no se enteran, y pueden quedar dos pallets con el mismo número.
-- **Cámara:** no cuenta dos veces la misma caja mientras la siga viendo. Para contar otra caja igual hay que sacar el código de la vista 1,5 segundos.
+- **Dos pestañas:** las dos muestran el mismo pallet y se actualizan solas.
+- **De un día para el otro:** el formulario de Abrir pallet pasa solo a la fecha nueva. Un pallet ya abierto conserva su fecha.
+- **Numeración:** cada fecha arranca en 1. El número se elige al abrir y no se puede repetir en la misma fecha. Si otro dispositivo cerró ese número mientras tanto, el resumen y el aviso muestran con qué número queda. Sin señal, o si dos dispositivos cierran casi al mismo tiempo, pueden quedar dos pallets con el mismo número.
+- **Cámara:** en cada pasada cuenta cada producto una sola vez, y cada caja contada hace un pitido. La pasada termina cuando la cámara deja de ver códigos 1,5 segundos. Si no sonó el pitido, esa caja no se contó.
 - **Pistola:** cada lectura suma una caja, aunque sea el mismo código.
-- **Deshacer último escaneo** saca la última caja leída. El botón **−1** de cada producto saca una caja de ese producto, aunque no sea la última.
+- **Deshacer último escaneo** saca la última caja leída. El botón **−1** de cada producto saca una caja de esa fila, aunque no sea la última. Un doble toque saca una sola.
+- **Editar un producto con el pallet abierto:** las cajas ya leídas no cambian. Las nuevas salen en otra fila, y cada fila da bien sus cuentas.
 
 ## Antes de usar datos reales
 
 - `firestore.rules` deja la base abierta a cualquiera que tenga el link, y deja de permitir todo el 1 de febrero de 2027. Hay que agregar inicio de sesión y cambiar esas reglas.
-- Si las reglas vencen, al cerrar un pallet aparece un aviso de error y las cajas vuelven a la pantalla: no se pierden, pero no se guarda nada hasta actualizar las reglas.
+- Si las reglas vencen, al cerrar un pallet aparece un aviso de error y las cajas vuelven a la pantalla, o vuelven al terminar el pallet que esté abierto. No se guarda nada hasta actualizar las reglas. En un dispositivo nuevo tampoco cargan los productos, y la app muestra ese mismo motivo.
+- Problema conocido: si un pallet se cierra sin señal, se cierra la pestaña y al volver la señal Firebase rechaza el guardado, ese pallet se pierde sin aviso. Solo pasa con reglas vencidas o mal escritas. Se resuelve en la etapa de Firebase.

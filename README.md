@@ -14,7 +14,7 @@ Al abrirlo, Android va a pedir permiso para instalar apps de esta fuente. Despu�
 
 Mientras no esté conectado Firebase, cada celular guarda sus datos adentro de la app o del navegador. La app y la página no comparten datos entre sí.
 
-La pistola Bluetooth se vincula desde el Bluetooth del celular, como si fuera un teclado.
+La pistola Bluetooth se vincula desde el Bluetooth del celular, como si fuera un teclado. Si al leer se abre el teclado de pantalla, desactivá **Mostrar teclado virtual** en los ajustes de teclado físico de Android.
 
 ## Estructura de carpetas y archivos
 

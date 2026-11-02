@@ -1,9 +1,13 @@
 // Todo lo que lee códigos: la pistola y la cámara. Este archivo no sabe qué es un pallet:
 // solo entrega el texto leído a la función alLeer.
 
-// La cámara detecta el mismo código varias veces por segundo mientras lo ve. Solo se cuenta
-// de nuevo si dejó de verlo durante este tiempo.
+// La cámara detecta los códigos a la vista varias veces por segundo. Cada caja se cuenta una
+// sola vez por pasada, y la pasada termina cuando deja de ver todo código durante este tiempo.
 const TIEMPO_PARA_OTRA_CAJA_MS = 1500;
+
+// Además tiene que haber analizado estas imágenes sin código. En un celular lento pueden
+// pasar 1,5 s entre dos lecturas de un código que nunca salió de la vista.
+const IMAGENES_SIN_CODIGO = 3;
 
 // La pistola funciona como un teclado: escribe el código en el campo que tiene el foco y
 // presiona Enter, que envía el formulario.
@@ -57,7 +61,18 @@ export function mantenerFoco(campo, debeTenerFoco) {
 
 let camara = null;
 
-export async function encenderCamara(idContenedor, alLeer) {
+// Las cajas contadas en la pasada actual. Viven afuera de encenderCamara: apagar y prender
+// la cámara con una caja a la vista no la tiene que contar de nuevo.
+const cajasVistas = new Set();
+let ultimaDeteccion = 0;
+let imagenesSinCodigo = 0;
+
+export function olvidarCajasVistas() {
+  cajasVistas.clear();
+}
+
+// claveDeCaja dice qué códigos son de la misma caja: una etiqueta puede traer dos.
+export async function encenderCamara(idContenedor, alLeer, claveDeCaja) {
   const formatos = Html5QrcodeSupportedFormats;
   const nuevaCamara = new Html5Qrcode(idContenedor, {
     verbose: false,
@@ -76,16 +91,18 @@ export async function encenderCamara(idContenedor, alLeer) {
     experimentalFeatures: { useBarCodeDetectorIfSupported: true },
   });
 
-  let ultimoCodigo = null;
-  let ultimaVezVisto = 0;
-
   const alDetectar = (codigo) => {
     const ahora = Date.now();
-    const sigueSiendoLaMismaCaja = codigo === ultimoCodigo
-      && ahora - ultimaVezVisto < TIEMPO_PARA_OTRA_CAJA_MS;
-    ultimoCodigo = codigo;
-    ultimaVezVisto = ahora;
-    if (!sigueSiendoLaMismaCaja) alLeer(codigo);
+    const terminoLaPasada = ahora - ultimaDeteccion >= TIEMPO_PARA_OTRA_CAJA_MS
+      && imagenesSinCodigo >= IMAGENES_SIN_CODIGO;
+    if (terminoLaPasada) cajasVistas.clear();
+    ultimaDeteccion = ahora;
+    imagenesSinCodigo = 0;
+
+    const caja = claveDeCaja(codigo);
+    if (cajasVistas.has(caja)) return;
+    cajasVistas.add(caja);
+    alLeer(codigo);
   };
 
   await nuevaCamara.start(
@@ -99,9 +116,12 @@ export async function encenderCamara(idContenedor, alLeer) {
       }),
     },
     alDetectar,
-    () => {}, // Se llama en cada imagen sin código: es lo normal, no hay nada que hacer.
+    () => { imagenesSinCodigo += 1; },
   );
   camara = nuevaCamara;
+  // El tiempo apagada no cuenta como que dejó de ver las cajas.
+  ultimaDeteccion = Date.now();
+  imagenesSinCodigo = 0;
 }
 
 export async function apagarCamara() {

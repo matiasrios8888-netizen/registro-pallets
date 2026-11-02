@@ -1,6 +1,12 @@
 // Pantalla "Escanear": primero se abre el pallet y después se escanea caja por caja.
 import { escucharPallets, guardarPallet } from './datos.js';
-import { apagarCamara, encenderCamara, escucharPistola, mantenerFoco } from './lector.js';
+import {
+  apagarCamara,
+  encenderCamara,
+  escucharPistola,
+  mantenerFoco,
+  olvidarCajasVistas,
+} from './lector.js';
 import {
   agregarProductoConCodigo,
   buscarProducto,
@@ -35,6 +41,7 @@ let visible = true;
 let camaraEncendida = false;
 let codigoDesconocido = null;
 let temporizadorVerde;
+let anchoDeLaCamara = 0;
 
 // Pallets ya cerrados en la fecha elegida: para saber qué número le toca al siguiente.
 let palletsDeLaFecha = [];
@@ -266,6 +273,7 @@ function quitarUnaCaja(codigoInterno) {
 function terminarPallet() {
   pallet = null;
   guardarPalletAbierto();
+  olvidarCajasVistas();
   if (camaraEncendida) apagarLaCamara();
   prepararApertura();
   pintarPantalla();
@@ -370,15 +378,19 @@ async function encenderLaCamara() {
   try {
     await encenderCamara('camara', (codigo) => {
       if (visible && !document.querySelector('dialog[open]')) procesarCodigo(codigo);
-    });
+    }, (codigo) => buscarProducto(codigo)?.codigoInterno ?? codigo);
     camaraEncendida = true;
+    anchoDeLaCamara = document.documentElement.clientWidth;
     botonCamara.textContent = 'Apagar cámara';
+    marcoCamara.scrollIntoView({ block: 'nearest' });
   } catch (error) {
     console.error(error);
     marcoCamara.hidden = true;
     avisar(mensajeDeCamara(error), 'error');
   }
   botonCamara.disabled = false;
+  // Si mientras arrancaba se cambió de pantalla o se cerró el pallet, nadie más la apaga.
+  if (camaraEncendida && (!visible || !pallet)) apagarLaCamara().catch(console.error);
 }
 
 async function apagarLaCamara() {
@@ -386,6 +398,14 @@ async function apagarLaCamara() {
   botonCamara.textContent = 'Usar cámara';
   marcoCamara.hidden = true;
   await apagarCamara();
+}
+
+// html5-qrcode fija el ancho del video al encender. Si se gira el celular hay que reiniciarla:
+// si no, el video queda del ancho viejo y el recuadro de lectura queda corrido.
+async function reiniciarCamaraSiCambioElAncho() {
+  if (!camaraEncendida || document.documentElement.clientWidth === anchoDeLaCamara) return;
+  await apagarLaCamara();
+  await encenderLaCamara();
 }
 
 export function iniciarPantallaEscaneo() {
@@ -415,6 +435,7 @@ export function iniciarPantallaEscaneo() {
   botonCerrar.addEventListener('click', cerrarPallet);
   document.getElementById('btn-descartar').addEventListener('click', descartarPallet);
   document.getElementById('btn-escribir').addEventListener('click', escribirAMano);
+  window.addEventListener('resize', () => reiniciarCamaraSiCambioElAncho().catch(console.error));
 }
 
 export function alMostrarEscaneo() {

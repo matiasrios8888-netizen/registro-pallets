@@ -69,6 +69,12 @@
             <button id="btn-agregar-codigo" type="button" class="boton boton-sobre-rojo" hidden>Agregar a Productos</button>
           </div>
 
+          <!-- Pegado al tablero: al apuntar con la cámara hay que ver el video y el color juntos -->
+          <div id="marco-camara" class="marco-camara" hidden>
+            <div id="camara"></div>
+            <p class="ayuda-camara">Apuntá al código de una caja. Cada caja contada hace un pitido. Para contar otra, sacá el código de la vista 2 segundos y volvé a apuntar.</p>
+          </div>
+
           <!-- Este campo siempre tiene el foco: la pistola escribe acá y presiona Enter -->
           <form id="form-lector" class="form-lector" data-listo="false">
             <label for="campo-lector" class="etiqueta-lector">
@@ -82,11 +88,6 @@
           </form>
 
           <button id="btn-deshacer" type="button" class="boton boton-secundario" disabled>Deshacer último escaneo</button>
-
-          <div id="marco-camara" class="marco-camara" hidden>
-            <div id="camara"></div>
-            <p class="ayuda-camara">Apuntá al código de una caja. Para contar otra caja igual, sacá la cámara un momento y volvé a apuntar.</p>
-          </div>
 
           <div class="dos-botones">
             <button id="btn-camara" type="button" class="boton boton-secundario">Usar cámara</button>

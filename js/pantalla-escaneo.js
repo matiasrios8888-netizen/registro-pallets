@@ -148,7 +148,14 @@ function prepararApertura() {
 // Si la app queda abierta de un día para el otro, el formulario no puede seguir proponiendo
 // la fecha de ayer. Una fecha elegida a mano se respeta.
 function renovarFecha() {
-  if (!pallet && campoFecha.value === fechaSugerida && fechaSugerida !== fechaDeHoy()) prepararApertura();
+  const hoy = fechaDeHoy();
+  if (pallet || fechaSugerida === hoy) return;
+  const eraAutomatica = campoFecha.value === fechaSugerida;
+  fechaSugerida = hoy;
+  if (!eraAutomatica) return;
+  campoFecha.value = hoy;
+  escucharPalletsDe(hoy);
+  completarNumeroAutomatico();
 }
 
 function mostrarErrorDeApertura(mensaje) {
@@ -181,7 +188,7 @@ function abrirPallet(evento) {
   }
   // Pasa si alguien escanea una caja con el cursor en este campo. Cuatro cifras seguidas no
   // aparecen en un nombre, y están en cualquier código, aunque no esté en Productos.
-  if (/\d{4}/.test(responsable)) {
+  if (/\d{4}/.test(responsable) || buscarProducto(responsable)) {
     mostrarErrorDeApertura('En Responsable quedó un código de caja. Escribí el nombre.');
     return;
   }

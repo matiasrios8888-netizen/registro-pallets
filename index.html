@@ -32,7 +32,7 @@
         <h1>Abrir pallet</h1>
         <form id="form-apertura">
           <label class="campo" for="apertura-numero">Número de pallet
-            <input id="apertura-numero" type="number" min="1" max="9999" step="1" inputmode="numeric" required>
+            <input id="apertura-numero" pattern="[1-9][0-9]{0,3}" title="Número de 1 a 9999" inputmode="numeric" autocomplete="off" required>
           </label>
           <p class="ayuda-campo">Se completa solo con el siguiente. Si querés otro, cambialo.</p>
           <label class="campo" for="apertura-fecha">Fecha

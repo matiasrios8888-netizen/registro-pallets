@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Códigos de prueba</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.12.3/dist/JsBarcode.all.min.js" defer></script>
+  <style>
+    body {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 16px;
+      background: #fff;
+      color: #15262f;
+      font-family: system-ui, sans-serif;
+    }
+
+    .producto {
+      padding-block: 12px;
+      border-top: 2px solid #d2d5d0;
+      break-inside: avoid;
+    }
+
+    .producto h2 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+
+    .codigos {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+    }
+
+    canvas {
+      max-width: 100%;
+    }
+
+    .falta-internet {
+      color: #c4122f;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <h1>Códigos de prueba</h1>
+  <p>Imprimí esta hoja o abrila en la PC y apuntale con la pistola o la cámara del celular. Cada producto tiene dos códigos, para probar los dos casos: que la caja traiga un código de barras EAN o el código interno.</p>
+  <p id="falta-internet" class="falta-internet" hidden>No se pudo cargar el generador de códigos. Revisá la conexión y recargá la página.</p>
+  <div id="productos"></div>
+
+  <script type="module">
+    import { productosDePrueba } from './js/datos-prueba.js';
+
+    // El módulo corre después de los scripts con "defer", así que JsBarcode ya está cargado.
+    if (typeof JsBarcode === 'undefined') {
+      document.getElementById('falta-internet').hidden = false;
+    } else {
+      const contenedor = document.getElementById('productos');
+
+      function dibujarCodigo(padre, texto, formato) {
+        const lienzo = document.createElement('canvas');
+        padre.append(lienzo);
+        JsBarcode(lienzo, texto, { format: formato, height: 80, width: 3, displayValue: true });
+      }
+
+      for (const producto of productosDePrueba) {
+        const fila = document.createElement('section');
+        fila.className = 'producto';
+        const titulo = document.createElement('h2');
+        titulo.textContent = `${producto.codigoInterno}: ${producto.descripcion}`;
+        const codigos = document.createElement('div');
+        codigos.className = 'codigos';
+        fila.append(titulo, codigos);
+        contenedor.append(fila);
+
+        dibujarCodigo(codigos, producto.codigoBarras, 'EAN13');
+        dibujarCodigo(codigos, producto.codigoInterno, 'CODE128');
+      }
+    }
+  </script>
+</body>
+</html>

@@ -11,6 +11,7 @@ import {
 import {
   agregarProductoConCodigo,
   buscarProducto,
+  errorAlCargarProductos,
   normalizarCodigo,
   productosCargados,
 } from './productos.js';
@@ -87,13 +88,19 @@ function guardarPalletAbierto() {
   else localStorage.removeItem(CLAVE_PALLET_ABIERTO);
 }
 
+// Si se editó el producto con el pallet abierto, las cajas de antes y las de después van en
+// filas separadas: si no, cajas por unidades por caja no daría el total de la fila.
+const claveDeFila = ({ codigoInterno, descripcion, unidadesPorCaja }) => (
+  `${codigoInterno}|${descripcion}|${unidadesPorCaja}`);
+
 function agruparPorProducto(lecturas) {
   const grupos = new Map();
   for (const lectura of lecturas) {
-    const grupo = grupos.get(lectura.codigoInterno) ?? { ...lectura, cajas: 0, unidades: 0 };
+    const clave = claveDeFila(lectura);
+    const grupo = grupos.get(clave) ?? { ...lectura, cajas: 0, unidades: 0 };
     grupo.cajas += 1;
     grupo.unidades += lectura.unidadesPorCaja;
-    grupos.set(lectura.codigoInterno, grupo);
+    grupos.set(clave, grupo);
   }
   return [...grupos.values()];
 }
@@ -198,7 +205,7 @@ function filaItem(item) {
       type: 'button',
       class: 'boton boton-secundario item-quitar',
       'aria-label': `Quitar una caja de ${item.codigoInterno}`,
-      alHacerClic: () => quitarUnaCaja(item.codigoInterno),
+      alHacerClic: () => quitarUnaCaja(item),
     }, '−1'),
     crear('p', { class: 'item-cantidades' },
       crear('span', {}, cajas(item.cajas)),
@@ -253,7 +260,10 @@ function procesarCodigo(textoLeido) {
   if (!codigo || !pallet) return;
 
   if (!productosCargados()) {
-    rechazarLectura('No se sumó', 'Los productos todavía están cargando. Escaneá de nuevo.');
+    const error = errorAlCargarProductos();
+    rechazarLectura('No se sumó', error
+      ? motivoDelError(error)
+      : 'Los productos todavía están cargando. Escaneá de nuevo.');
     return;
   }
 
@@ -267,6 +277,10 @@ function procesarCodigo(textoLeido) {
 
   // Guardamos una copia de los datos: si después se edita el producto, el pallet no cambia.
   const { codigoInterno, codigoBarras, descripcion, unidadesPorCaja } = producto;
+  if (!unidadesPorCaja) {
+    rechazarLectura('No se sumó', `${codigoInterno}: faltan las unidades por caja en Productos.`);
+    return;
+  }
   pallet.lecturas.push({ codigoInterno, codigoBarras, descripcion, unidadesPorCaja });
   guardarPalletAbierto();
   pintarPantalla();
@@ -282,11 +296,12 @@ function deshacerUltimoEscaneo() {
   mostrarEnTablero('espera', `Se deshizo una caja de ${lectura.codigoInterno}`, lectura.descripcion);
 }
 
-function quitarUnaCaja(codigoInterno) {
-  pallet.lecturas.splice(pallet.lecturas.findLastIndex((l) => l.codigoInterno === codigoInterno), 1);
+function quitarUnaCaja(item) {
+  const clave = claveDeFila(item);
+  pallet.lecturas.splice(pallet.lecturas.findLastIndex((l) => claveDeFila(l) === clave), 1);
   guardarPalletAbierto();
   pintarPantalla();
-  mostrarEnTablero('espera', `Se quitó una caja de ${codigoInterno}`);
+  mostrarEnTablero('espera', `Se quitó una caja de ${item.codigoInterno}`);
 }
 
 // Después de cerrar o descartar, la pantalla vuelve a "Abrir pallet".

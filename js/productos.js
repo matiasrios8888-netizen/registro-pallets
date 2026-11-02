@@ -6,12 +6,14 @@ import {
   avisarErrorDeDatos,
   confirmar,
   crear,
+  motivoDelError,
   senalError,
   unidades,
 } from './ui.js';
 
 let productos = [];
 let cargados = false;
+let errorDeCarga = null;
 let productoEnEdicion = null;
 let alGuardarFormulario = null;
 
@@ -29,9 +31,21 @@ const mensajeFormulario = document.getElementById('mensaje-formulario');
 
 export const productosCargados = () => cargados;
 
+export const errorAlCargarProductos = () => errorDeCarga;
+
 export function normalizarCodigo(texto) {
   return String(texto ?? '').trim().toUpperCase();
 }
+
+// Un producto cargado a mano desde la consola de Firebase puede traer campos que faltan o
+// números guardados como texto. Acá todos quedan con la misma forma.
+const productoCompleto = (producto) => ({
+  ...producto,
+  codigoBarras: String(producto.codigoBarras ?? ''),
+  codigoInterno: String(producto.codigoInterno ?? ''),
+  descripcion: String(producto.descripcion ?? ''),
+  unidadesPorCaja: Number(producto.unidadesPorCaja) || 0,
+});
 
 // Algunas pistolas agregan o sacan ceros adelante de un código numérico (0779... y 779...).
 // Para comparar, los ignoramos.
@@ -177,12 +191,19 @@ function pasarAlCampoSiguiente(evento) {
   else senalError();
 }
 
+function alFallarLaCarga(error) {
+  errorDeCarga = error;
+  avisarErrorDeDatos(error);
+  lista.replaceChildren(crear('li', { class: 'vacio' }, motivoDelError(error)));
+}
+
 export function iniciarProductos() {
   escucharProductos((listaNueva) => {
-    productos = listaNueva;
+    productos = listaNueva.map(productoCompleto);
     cargados = true;
+    errorDeCarga = null;
     pintarLista();
-  }, avisarErrorDeDatos);
+  }, alFallarLaCarga);
 
   buscador.addEventListener('input', pintarLista);
   // Con la pistola: el texto queda seleccionado y la lectura siguiente lo reemplaza.

@@ -45,7 +45,9 @@ export function escucharPallets(fecha, alCambiar, alFallar) {
   return onSnapshot(palletsDelDia, (r) => alCambiar(aLista(r)), alFallar);
 }
 
-export function guardarPallet(pallet) {
+// async: si un dato es inválido, setDoc falla en el momento y no con la promesa. Así ese
+// error también llega al .catch de quien guarda.
+export async function guardarPallet(pallet) {
   return setDoc(doc(collection(db, 'pallets')), pallet);
 }
 

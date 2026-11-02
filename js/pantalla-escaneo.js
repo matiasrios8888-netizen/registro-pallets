@@ -322,12 +322,16 @@ function procesarCodigo(textoLeido) {
   senalOk();
 }
 
-// Un doble toque sin querer no debe sacar dos cajas.
+// Un doble toque sin querer no debe sacar dos cajas. Suena la alerta para que se note que
+// ese toque no quitó nada.
 function esToqueRepetido() {
   const ahora = performance.now();
-  const repetido = ahora - ultimaQuita < ESPERA_ENTRE_QUITAS_MS;
+  if (ahora - ultimaQuita < ESPERA_ENTRE_QUITAS_MS) {
+    senalError();
+    return true;
+  }
   ultimaQuita = ahora;
-  return repetido;
+  return false;
 }
 
 function deshacerUltimoEscaneo() {
@@ -336,7 +340,7 @@ function deshacerUltimoEscaneo() {
   if (!lectura) return;
   guardarPalletAbierto();
   pintarPantalla();
-  mostrarEnTablero('espera', `Se deshizo una caja de ${lectura.codigoInterno}`, lectura.descripcion);
+  mostrarEnTablero('espera', 'Se deshizo una caja', lectura.codigoInterno);
 }
 
 function quitarUnaCaja(item) {
@@ -345,7 +349,7 @@ function quitarUnaCaja(item) {
   pallet.lecturas.splice(pallet.lecturas.findLastIndex((l) => claveDeFila(l) === clave), 1);
   guardarPalletAbierto();
   pintarPantalla();
-  mostrarEnTablero('espera', `Se quitó una caja de ${item.codigoInterno}`);
+  mostrarEnTablero('espera', 'Se quitó una caja', item.codigoInterno);
 }
 
 // Después de cerrar o descartar, la pantalla vuelve a "Abrir pallet".

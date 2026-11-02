@@ -101,17 +101,38 @@ function armarFilas() {
   })));
 }
 
-// Baja un Excel con los pallets de la fecha elegida.
+// En la app de Android no existen las descargas del navegador. El Excel se guarda adentro de
+// la app y se abre el menú Compartir, para mandarlo por WhatsApp, por mail o a Archivos.
+async function compartirExcelEnAndroid(libro, nombre) {
+  const { Filesystem, Share } = window.Capacitor.Plugins;
+  const data = XLSX.write(libro, { type: 'base64', bookType: 'xlsx' });
+  const { uri } = await Filesystem.writeFile({ path: nombre, data, directory: 'CACHE' });
+  await Share.share({ title: nombre, url: uri });
+}
+
+// Genera un Excel con los pallets de la fecha elegida: en la PC o el navegador del celular lo
+// baja, y en la app de Android abre el menú Compartir.
 function exportarExcel() {
   if (typeof XLSX === 'undefined') {
-    avisar('No se pudo cargar Excel. Revisá la conexión y recargá la página.', 'error');
+    avisar('No se pudo cargar Excel. Recargá la página.', 'error');
     return;
   }
   const hoja = XLSX.utils.json_to_sheet(armarFilas());
   hoja['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 22 }, { wch: 12 }, { wch: 40 }, { wch: 8 }, { wch: 10 }];
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, 'Pallets');
-  XLSX.writeFile(libro, `pallets-${campoFecha.value}.xlsx`);
+  const nombre = `pallets-${campoFecha.value}.xlsx`;
+
+  if (!window.Capacitor?.isNativePlatform()) {
+    XLSX.writeFile(libro, nombre);
+    return;
+  }
+  compartirExcelEnAndroid(libro, nombre).catch((error) => {
+    // Cerrar el menú Compartir sin elegir nada también llega acá, y no es un error.
+    if (String(error).includes('canceled')) return;
+    console.error(error);
+    avisar('No se pudo generar el Excel. Probá de nuevo.', 'error');
+  });
 }
 
 // Conecta el campo de fecha y el botón de Excel. Se llama una sola vez, al arrancar la app.

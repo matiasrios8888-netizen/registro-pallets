@@ -38,6 +38,11 @@
   display: none !important;
 }
 
+/* La barra de abajo es fija: lo que el navegador lleva a la vista tiene que quedar arriba de ella. */
+html {
+  scroll-padding-bottom: 100px;
+}
+
 body {
   display: flex;
   flex-direction: column;
@@ -389,7 +394,11 @@ h2 {
 
 .campo-con-boton .boton {
   width: auto;
-  padding-inline: 28px;
+  padding-inline: 14px;
+}
+
+#campo-lector {
+  padding-inline: 8px;
 }
 
 /* Campos de formulario */
@@ -458,6 +467,7 @@ input {
   font-size: 30px;
   font-weight: 700;
   line-height: 1.1;
+  overflow-wrap: anywhere;
 }
 
 .item-cantidades {
@@ -528,7 +538,6 @@ input {
 
 .tabla-items td.codigo {
   font-size: 24px;
-  overflow-wrap: normal;
 }
 
 .tabla-items .numero {
@@ -545,12 +554,43 @@ input {
   overflow-wrap: normal;
 }
 
+/* En pantallas angostas la descripción baja a su propio renglón: las cifras nunca se cortan. */
+@media (max-width: 600px) {
+  .tabla-items,
+  .tabla-items thead,
+  .tabla-items tbody {
+    display: block;
+  }
+
+  .tabla-items tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 60px 116px;
+  }
+
+  .tabla-items th:nth-child(2) {
+    display: none;
+  }
+
+  .tabla-items td:nth-child(2) {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
 .confirmar-contenido {
   max-height: 45dvh;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
+/* El total siempre a la vista, aunque la lista de productos sea larga. */
 .dialogo .resumen-total {
+  position: sticky;
+  bottom: 0;
+  margin-bottom: 0;
+  background: var(--chapa);
   font-family: var(--letra-angosta);
   font-size: 28px;
   font-weight: 700;
@@ -666,6 +706,7 @@ input {
   color: #fff;
   font-size: 22px;
   font-weight: 500;
+  pointer-events: none; /* No se traga el toque del botón que tenga abajo. */
 }
 
 .aviso[data-tipo='error'] {
@@ -674,8 +715,9 @@ input {
 
 /* Ventanas */
 .dialogo {
-  width: min(92vw, 560px);
-  padding: 20px;
+  width: min(96vw, 560px);
+  max-width: none; /* El navegador limita el ancho de las ventanas: le sacaría 46 px. */
+  padding: 16px;
   border: 0;
   border-radius: 10px;
   background: var(--chapa);
@@ -689,6 +731,13 @@ input {
 .dialogo p {
   margin-block: 10px 18px;
   font-size: 22px;
+}
+
+@media (max-width: 440px) {
+  .dialogo .boton {
+    padding-inline: 6px;
+    font-size: 24px;
+  }
 }
 
 /* En pantallas grandes: tablero a la izquierda, detalle a la derecha, y el menú arriba. */

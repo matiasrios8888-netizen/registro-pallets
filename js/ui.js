@@ -92,7 +92,7 @@ export function avisar(mensaje, tipo = 'normal') {
 export function motivoDelError(error) {
   console.error(error);
   if (error?.code === 'permission-denied') {
-    return 'Firebase no dio permiso: revisá las reglas de firestore.rules, pueden haber vencido.';
+    return 'Firebase no dio permiso: revisá las reglas de firestore.rules, pueden haber vencido. Después de corregirlas, recargá la página.';
   }
   return `Falló la base de datos (${error?.code ?? error?.message ?? 'error desconocido'}).`;
 }

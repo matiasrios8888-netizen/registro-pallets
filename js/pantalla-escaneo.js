@@ -311,8 +311,8 @@ function procesarCodigo(textoLeido) {
 
   // Guardamos una copia de los datos: si después se edita el producto, el pallet no cambia.
   const { codigoInterno, codigoBarras, descripcion, unidadesPorCaja } = producto;
-  if (!unidadesPorCaja) {
-    rechazarLectura('No se sumó', `${codigoInterno}: faltan las unidades por caja en Productos.`);
+  if (!codigoInterno || !unidadesPorCaja) {
+    rechazarLectura('No se sumó', `${codigoInterno || codigo}: faltan datos en Productos.`);
     return;
   }
   pallet.lecturas.push({ codigoInterno, codigoBarras, descripcion, unidadesPorCaja });

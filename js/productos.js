@@ -11,6 +11,8 @@ import {
   unidades,
 } from './ui.js';
 
+const UNIDADES_POR_CAJA_MAXIMAS = 100000;
+
 let productos = [];
 let cargados = false;
 let errorDeCarga = null;
@@ -37,6 +39,13 @@ export function normalizarCodigo(texto) {
   return String(texto ?? '').trim().toUpperCase();
 }
 
+// Number() sola aceptaría -5, 2,5 o "Infinity", y "1.200" lo leería como 1,2.
+function unidadesValidas(valor) {
+  const texto = String(valor ?? '').trim();
+  const numero = /^\d+$/.test(texto) ? Number(texto) : 0;
+  return numero <= UNIDADES_POR_CAJA_MAXIMAS ? numero : 0;
+}
+
 // Un producto cargado a mano desde la consola de Firebase puede traer campos que faltan o
 // números guardados como texto. Acá todos quedan con la misma forma.
 const productoCompleto = (producto) => ({
@@ -44,7 +53,7 @@ const productoCompleto = (producto) => ({
   codigoBarras: String(producto.codigoBarras ?? ''),
   codigoInterno: String(producto.codigoInterno ?? ''),
   descripcion: String(producto.descripcion ?? ''),
-  unidadesPorCaja: Number(producto.unidadesPorCaja) || 0,
+  unidadesPorCaja: unidadesValidas(producto.unidadesPorCaja),
 });
 
 // Algunas pistolas agregan o sacan ceros adelante de un código numérico (0779... y 779...).

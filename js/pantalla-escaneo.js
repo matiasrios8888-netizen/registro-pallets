@@ -328,11 +328,11 @@ async function cerrarPallet() {
     si: 'Guardar y cerrar',
     no: 'Seguir escaneando',
   });
-  if (!guardar) return;
+  // pallet puede ser null: otra pestaña pudo haberlo cerrado con esta pregunta abierta.
+  if (!guardar || !pallet) return;
 
-  // Otro dispositivo pudo haber cerrado un pallet con este número mientras se armaba este.
   const palletCerrado = pallet;
-  const numero = numeroOcupado(pallet.numero) ? numeroLibre() : pallet.numero;
+  const numero = numeroParaCerrar();
 
   guardarPallet({
     numero,
@@ -443,6 +443,20 @@ async function reiniciarCamaraSiCambioElAncho() {
   await encenderLaCamara();
 }
 
+// Si la app está abierta en otra pestaña, las dos trabajan sobre el mismo pallet.
+function alCambiarEnOtraPestana(evento) {
+  if (evento.key !== CLAVE_PALLET_ABIERTO) return;
+  pallet = JSON.parse(evento.newValue ?? 'null');
+  if (pallet) {
+    escucharPalletsDe(pallet.fecha);
+  } else {
+    if (camaraEncendida) apagarLaCamara();
+    prepararApertura();
+  }
+  pintarPantalla();
+  enfocarLector();
+}
+
 export function iniciarPantallaEscaneo() {
   if (pallet) escucharPalletsDe(pallet.fecha);
   else prepararApertura();
@@ -483,6 +497,7 @@ export function iniciarPantallaEscaneo() {
   document.getElementById('btn-descartar').addEventListener('click', descartarPallet);
   document.getElementById('btn-escribir').addEventListener('click', escribirAMano);
   window.addEventListener('resize', () => reiniciarCamaraSiCambioElAncho().catch(console.error));
+  window.addEventListener('storage', alCambiarEnOtraPestana);
 }
 
 export function alMostrarEscaneo() {

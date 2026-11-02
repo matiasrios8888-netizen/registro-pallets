@@ -139,6 +139,7 @@ function escucharPalletsDe(fecha) {
   dejarDeEscuchar = escucharPallets(fecha, (lista) => {
     palletsDeLaFecha = lista;
     completarNumeroAutomatico();
+    pintarPantalla();
   }, avisarErrorDeDatos);
 }
 
@@ -242,7 +243,7 @@ function pintarPantalla() {
 
   const items = agruparPorProducto(pallet.lecturas);
   const totalCajas = pallet.lecturas.length;
-  tituloTablero.textContent = `Pallet ${pallet.numero}`;
+  tituloTablero.textContent = `Pallet ${numeroParaCerrar()}`;
   datosTablero.textContent = `${fechaParaMostrar(pallet.fecha)}, ${pallet.responsable}`;
   contador.textContent = totalCajas;
   contadorApagado.textContent = '8'.repeat(Math.max(3, String(totalCajas).length));
@@ -286,6 +287,11 @@ function rechazarLectura(titulo, detalle) {
 function procesarCodigo(textoLeido) {
   const codigo = normalizarCodigo(textoLeido);
   if (!codigo || !pallet) return;
+
+  if (pallet.devuelto) {
+    rechazarLectura('No se sumó: este pallet no se guardó', 'Cerralo de nuevo antes de escanear.');
+    return;
+  }
 
   if (!productosCargados()) {
     const error = errorAlCargarProductos();
@@ -365,11 +371,13 @@ function devolverPalletRechazado() {
   const [rechazado, ...resto] = leerRechazados();
   if (pallet || !rechazado) return;
   guardarRechazados(resto);
-  pallet = rechazado;
+  // devuelto: no suma más cajas, para que la pistola no siga cargando el pallet nuevo en este.
+  pallet = { ...rechazado, devuelto: true };
   guardarPalletAbierto();
   escucharPalletsDe(pallet.fecha);
   pintarPantalla();
-  mostrarEnTablero('espera', 'Este pallet no se guardó', 'Cerralo de nuevo cuando esté resuelto.');
+  mostrarEstadoDelPallet();
+  senalError();
   enfocarLector();
 }
 
@@ -407,7 +415,7 @@ async function cerrarPallet() {
     items,
   }).catch((error) => {
     // Si Firebase lo rechaza, las cajas vuelven a la pantalla en vez de perderse.
-    guardarRechazados([...leerRechazados(), palletCerrado]);
+    guardarRechazados([...leerRechazados(), { ...palletCerrado, numero }]);
     const cuando = pallet ? 'van a volver cuando termines este pallet' : 'volvieron a la pantalla';
     devolverPalletRechazado();
     avisar(`El pallet ${numero} no se guardó y sus cajas ${cuando}. ${motivoDelError(error)}`, 'error');

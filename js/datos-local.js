@@ -7,10 +7,13 @@ const CLAVE_PALLETS = 'registro-pallets.v2.pallets';
 
 // Funciones que hay que volver a llamar cuando cambian los datos.
 const oyentes = new Set();
+// Les avisa a todas las pantallas que están escuchando.
 const avisarCambio = () => oyentes.forEach((avisar) => avisar());
 
+// Lee una lista guardada. Si todavía no existe, devuelve una lista vacía.
 const leer = (clave) => JSON.parse(localStorage.getItem(clave) ?? '[]');
 
+// Guarda una lista y avisa del cambio.
 function escribir(clave, lista) {
   localStorage.setItem(clave, JSON.stringify(lista));
   avisarCambio();
@@ -19,6 +22,7 @@ function escribir(clave, lista) {
 // Hace lo mismo que onSnapshot de Firestore: llama ahora y cada vez que algo cambie.
 // Devuelve una función para dejar de escuchar.
 function escuchar(obtenerLista, alCambiar) {
+  // Vuelve a leer la lista y se la pasa a quien está escuchando.
   const avisar = () => alCambiar(obtenerLista());
   oyentes.add(avisar);
   avisar();
@@ -28,6 +32,7 @@ function escuchar(obtenerLista, alCambiar) {
 // Si la app está abierta en otra pestaña, también se entera de los cambios.
 window.addEventListener('storage', avisarCambio);
 
+// Genera un id único, como los que crea Firestore.
 const nuevoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
 // La primera vez que se abre la app ya están los productos de prueba, para probar rápido.
@@ -38,28 +43,35 @@ if (localStorage.getItem(CLAVE_PRODUCTOS) === null) {
   ));
 }
 
+// Llama a alCambiar ahora y con cada cambio de productos. Devuelve la función para dejar de escuchar.
 export function escucharProductos(alCambiar) {
   return escuchar(() => leer(CLAVE_PRODUCTOS), alCambiar);
 }
 
+// Crea el producto o reemplaza el que tenga el mismo id. Estas funciones son async para
+// devolver una promesa, igual que las de Firestore.
 export async function guardarProducto(producto) {
   const lista = leer(CLAVE_PRODUCTOS).filter((p) => p.id !== producto.id);
   lista.push({ ...producto, id: producto.id ?? nuevoId() });
   escribir(CLAVE_PRODUCTOS, lista);
 }
 
+// Borra un producto de la tabla.
 export async function borrarProducto(id) {
   escribir(CLAVE_PRODUCTOS, leer(CLAVE_PRODUCTOS).filter((p) => p.id !== id));
 }
 
+// Igual que escucharProductos, para los pallets cerrados de una fecha ("2026-11-01").
 export function escucharPallets(fecha, alCambiar) {
   return escuchar(() => leer(CLAVE_PALLETS).filter((p) => p.fecha === fecha), alCambiar);
 }
 
+// Agrega un pallet cerrado con un id nuevo.
 export async function guardarPallet(pallet) {
   escribir(CLAVE_PALLETS, [...leer(CLAVE_PALLETS), { ...pallet, id: nuevoId() }]);
 }
 
+// Borra un pallet cerrado.
 export async function borrarPallet(id) {
   escribir(CLAVE_PALLETS, leer(CLAVE_PALLETS).filter((p) => p.id !== id));
 }

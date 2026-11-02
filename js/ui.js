@@ -2,6 +2,8 @@
 
 // Crea un elemento HTML. Los textos se agregan como texto puro, nunca como HTML: así un
 // código QR con contenido raro no puede meter nada en la página.
+// atributos: alHacerClic conecta el clic y lo demás son atributos HTML. hijos: textos o
+// elementos que van adentro.
 export function crear(etiqueta, atributos = {}, ...hijos) {
   const elemento = document.createElement(etiqueta);
   for (const [nombre, valor] of Object.entries(atributos)) {
@@ -15,8 +17,10 @@ export function crear(etiqueta, atributos = {}, ...hijos) {
 // Números con punto de miles, como se leen acá: 28.800.
 const formatearNumero = (numero) => numero.toLocaleString('es-AR');
 
+// Texto como "1 caja" o "28 cajas".
 export const cajas = (cantidad) => `${formatearNumero(cantidad)} ${cantidad === 1 ? 'caja' : 'cajas'}`;
 
+// Texto como "1 unidad" o "28.800 unidades".
 export const unidades = (cantidad) => `${formatearNumero(cantidad)} ${cantidad === 1 ? 'unidad' : 'unidades'}`;
 
 // Fecha de hoy según la hora del dispositivo, como "2026-11-01". No usar toISOString():
@@ -51,6 +55,7 @@ export function tablaDeItems(items) {
 // Sonidos: en planta hay ruido, por eso además vibra (en celular) y cambia el color.
 let audio;
 
+// Hace sonar un tono. La frecuencia va en Hz; la duración y la demora, en segundos.
 function tono(frecuencia, duracion, demora = 0) {
   audio ??= new AudioContext();
   audio.resume();
@@ -64,11 +69,13 @@ function tono(frecuencia, duracion, demora = 0) {
   oscilador.stop(audio.currentTime + demora + duracion);
 }
 
+// Un pitido agudo y una vibración corta: la lectura entró.
 export function senalOk() {
   tono(1320, 0.09);
   navigator.vibrate?.(60);
 }
 
+// Dos tonos graves y dos vibraciones: hubo un problema.
 export function senalError() {
   tono(220, 0.18);
   tono(220, 0.18, 0.24);
@@ -78,6 +85,7 @@ export function senalError() {
 // Mensaje que aparece un rato abajo de la pantalla.
 let temporizadorAviso;
 
+// Con tipo "error" sale en rojo y dura 10 segundos; si no, 4.
 export function avisar(mensaje, tipo = 'normal') {
   const aviso = document.getElementById('aviso');
   aviso.textContent = mensaje;
@@ -89,6 +97,7 @@ export function avisar(mensaje, tipo = 'normal') {
   }, tipo === 'error' ? 10000 : 4000);
 }
 
+// Traduce un error de la base a un mensaje claro, y lo deja en la consola para quien lo revise.
 export function motivoDelError(error) {
   console.error(error);
   if (error?.code === 'permission-denied') {
@@ -97,6 +106,7 @@ export function motivoDelError(error) {
   return `Falló la base de datos (${error?.code ?? error?.message ?? 'error desconocido'}).`;
 }
 
+// Muestra ese motivo en un aviso.
 export function avisarErrorDeDatos(error) {
   avisar(motivoDelError(error), 'error');
 }

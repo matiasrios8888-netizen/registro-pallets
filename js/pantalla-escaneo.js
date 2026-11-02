@@ -89,6 +89,7 @@ const botonCerrar = document.getElementById('btn-cerrar');
 const enfocarLector = mantenerFoco(campoLector, () => (
   visible && pallet !== null && !document.querySelector('dialog[open]')));
 
+// Copia el pallet abierto al dispositivo, o borra la copia si no hay ninguno.
 function guardarPalletAbierto() {
   if (pallet) localStorage.setItem(CLAVE_PALLET_ABIERTO, JSON.stringify(pallet));
   else localStorage.removeItem(CLAVE_PALLET_ABIERTO);
@@ -96,9 +97,11 @@ function guardarPalletAbierto() {
 
 // Si se editó el producto con el pallet abierto, las cajas de antes y las de después van en
 // filas separadas: si no, cajas por unidades por caja no daría el total de la fila.
+// Dos lecturas con la misma clave van en la misma fila.
 const claveDeFila = ({ codigoInterno, descripcion, unidadesPorCaja }) => (
   `${codigoInterno}|${descripcion}|${unidadesPorCaja}`);
 
+// Convierte las lecturas, una por caja, en filas con sus totales de cajas y unidades.
 function agruparPorProducto(lecturas) {
   const grupos = new Map();
   for (const lectura of lecturas) {
@@ -111,15 +114,20 @@ function agruparPorProducto(lecturas) {
   return [...grupos.values()];
 }
 
+// Suma las unidades de todas las filas.
 const sumarUnidades = (items) => items.reduce((suma, item) => suma + item.unidades, 0);
 
+// El siguiente número sin usar en la fecha: el mayor más uno.
 const numeroLibre = () => Math.max(0, ...palletsDeLaFecha.map((p) => p.numero)) + 1;
 
+// Dice si ya hay un pallet cerrado con ese número en la fecha.
 const numeroOcupado = (numero) => palletsDeLaFecha.some((p) => p.numero === numero);
 
 // Otro dispositivo pudo haber cerrado un pallet con este número mientras se armaba este.
+// Devuelve el número con el que va a quedar guardado el pallet abierto.
 const numeroParaCerrar = () => (numeroOcupado(pallet.numero) ? numeroLibre() : pallet.numero);
 
+// Escribe en el tablero cómo está el pallet: al abrirlo, al recargar o al llegar de otra pestaña.
 function mostrarEstadoDelPallet() {
   if (pallet.devuelto) {
     mostrarEnTablero('error', 'Este pallet no se guardó', 'Cerralo de nuevo cuando esté resuelto.');
@@ -128,10 +136,12 @@ function mostrarEstadoDelPallet() {
   }
 }
 
+// Sugiere el número libre, salvo que la persona haya escrito otro.
 function completarNumeroAutomatico() {
   if (!pallet && !numeroEscritoAMano) campoNumero.value = numeroLibre();
 }
 
+// Sigue los pallets cerrados de esa fecha para mantener al día la numeración.
 function escucharPalletsDe(fecha) {
   if (fecha === fechaEscuchada) return;
   fechaEscuchada = fecha;
@@ -168,17 +178,21 @@ function renovarFecha() {
   completarNumeroAutomatico();
 }
 
+// Muestra un mensaje en rojo en el formulario Abrir pallet.
 function mostrarErrorDeApertura(mensaje) {
   mensajeApertura.textContent = mensaje;
   mensajeApertura.hidden = false;
 }
 
 // Una lectura con el cursor en Fecha deja años como 0004.
+// Dice si la fecha está a 31 días o menos de hoy, para atrás o para adelante.
 function fechaCercana(fecha) {
   const distancia = Math.abs(new Date(`${fecha}T12:00`) - new Date(`${fechaDeHoy()}T12:00`));
   return distancia / MS_POR_DIA <= DIAS_DE_MARGEN_EN_LA_FECHA;
 }
 
+// Valida el formulario y abre el pallet. Si algo falla, muestra el motivo y no abre nada. Los
+// campos obligatorios y el formato del número ya los controló el navegador antes de llegar acá.
 function abrirPallet(evento) {
   evento.preventDefault();
   const numero = Number(campoNumero.value);
@@ -221,6 +235,7 @@ function noAbrirConEnter(evento) {
   senalError();
 }
 
+// Arma la fila de un producto en la lista, con su botón -1.
 function filaItem(item) {
   return crear('li', { class: 'item' },
     crear('div', { class: 'fila-datos' },
@@ -237,6 +252,8 @@ function filaItem(item) {
       crear('span', {}, unidades(item.unidades))));
 }
 
+// Dibuja la pantalla según el pallet: el formulario si no hay ninguno abierto, y si hay,
+// tablero, lista y botones. El texto de la última lectura lo pone mostrarEnTablero.
 function pintarPantalla() {
   vistaApertura.hidden = pallet !== null;
   vistaEscaneo.hidden = pallet === null;
@@ -257,6 +274,7 @@ function pintarPantalla() {
 }
 
 // Pinta el tablero: "ok" verde, "error" rojo, "espera" oscuro.
+// titulo y detalle son los dos renglones de la zona de lectura.
 function mostrarEnTablero(estado, titulo, detalle = '') {
   clearTimeout(temporizadorVerde);
   codigoDesconocido = null;
@@ -282,11 +300,14 @@ function mostrarEnTablero(estado, titulo, detalle = '') {
   }
 }
 
+// Pinta el tablero de rojo y hace sonar la alerta.
 function rechazarLectura(titulo, detalle) {
   mostrarEnTablero('error', titulo, detalle);
   senalError();
 }
 
+// Atiende una lectura de la pistola o de la cámara: busca el código y suma una caja, o avisa
+// en rojo por qué no la sumó.
 function procesarCodigo(textoLeido) {
   const codigo = normalizarCodigo(textoLeido);
   if (!codigo || !pallet) return;
@@ -337,6 +358,7 @@ function esToqueRepetido() {
   return false;
 }
 
+// Saca la última caja leída, sea del producto que sea.
 function deshacerUltimoEscaneo() {
   if (esToqueRepetido()) return;
   const lectura = pallet.lecturas.pop();
@@ -346,6 +368,7 @@ function deshacerUltimoEscaneo() {
   mostrarEnTablero('espera', 'Se deshizo una caja', lectura.codigoInterno);
 }
 
+// Saca la última caja leída de una fila de la lista (botón -1).
 function quitarUnaCaja(item) {
   if (esToqueRepetido()) return;
   const clave = claveDeFila(item);
@@ -356,6 +379,7 @@ function quitarUnaCaja(item) {
 }
 
 // Después de cerrar o descartar, la pantalla vuelve a "Abrir pallet".
+// Si hay un pallet rechazado esperando, vuelve a la pantalla en este momento.
 function terminarPallet() {
   pallet = null;
   guardarPalletAbierto();
@@ -366,8 +390,10 @@ function terminarPallet() {
   devolverPalletRechazado();
 }
 
+// Lista de pallets que la base rechazó y esperan volver a la pantalla.
 const leerRechazados = () => JSON.parse(localStorage.getItem(CLAVE_RECHAZADOS) ?? '[]');
 
+// Guarda esa lista en el dispositivo.
 function guardarRechazados(lista) {
   localStorage.setItem(CLAVE_RECHAZADOS, JSON.stringify(lista));
 }
@@ -388,6 +414,8 @@ function devolverPalletRechazado() {
   enfocarLector();
 }
 
+// Muestra el resumen final y, si se confirma, guarda el pallet. No espera a la base: sin señal
+// esa promesa no termina. Si después llega un rechazo, el .catch recupera las cajas.
 async function cerrarPallet() {
   const items = agruparPorProducto(pallet.lecturas);
   const totalCajas = pallet.lecturas.length;
@@ -432,6 +460,7 @@ async function cerrarPallet() {
   avisar(`Pallet ${numero} cerrado: ${cajas(totalCajas)} y ${unidades(totalUnidades)}`);
 }
 
+// Borra el pallet abierto. Si ya tiene cajas, pregunta antes.
 async function descartarPallet() {
   const total = pallet.lecturas.length;
   if (total > 0) {
@@ -448,6 +477,7 @@ async function descartarPallet() {
   avisar('Pallet descartado');
 }
 
+// Abre el formulario de producto con el código que no se encontró.
 function agregarCodigoDesconocido() {
   agregarProductoConCodigo(codigoDesconocido, () => {
     mostrarEnTablero('espera', 'Producto agregado', 'Escaneá esa caja de nuevo para sumarla.');
@@ -462,12 +492,14 @@ function escribirAMano() {
   campoLector.focus();
 }
 
+// Vuelve a ocultar el teclado después de escribir un código a mano.
 function volverAModoPistola() {
   if (campoLector.inputMode === 'none') return;
   campoLector.inputMode = 'none';
   campoLector.blur(); // Cierra el teclado. mantenerFoco devuelve el cursor al campo.
 }
 
+// Traduce el error de la cámara a un mensaje que se entienda.
 function mensajeDeCamara(error) {
   const detalle = String(error);
   if (detalle.includes('NotAllowed')) return 'Falta el permiso: permití usar la cámara en el navegador.';
@@ -475,6 +507,7 @@ function mensajeDeCamara(error) {
   return 'No se pudo encender la cámara. Probá recargar la página.';
 }
 
+// Enciende la cámara. Antes revisa que la página sea segura y que la librería haya cargado.
 async function encenderLaCamara() {
   if (!window.isSecureContext) {
     avisar('La cámara solo funciona si la app se abre desde https o localhost. Ver README.md.', 'error');
@@ -506,6 +539,7 @@ async function encenderLaCamara() {
   if (camaraEncendida && (!visible || !pallet)) apagarLaCamara().catch(console.error);
 }
 
+// Apaga la cámara y deja el botón y el recuadro como al principio.
 async function apagarLaCamara() {
   camaraEncendida = false;
   botonCamara.textContent = 'Usar cámara';
@@ -523,6 +557,7 @@ async function reiniciarCamaraSiCambioElAncho() {
 }
 
 // Si la app está abierta en otra pestaña, las dos trabajan sobre el mismo pallet.
+// evento es el "storage" del navegador, que solo les llega a las otras pestañas.
 function alCambiarEnOtraPestana(evento) {
   if (evento.key !== CLAVE_PALLET_ABIERTO) return;
   pallet = JSON.parse(evento.newValue ?? 'null');
@@ -540,6 +575,7 @@ function alCambiarEnOtraPestana(evento) {
   enfocarLector();
 }
 
+// Prepara la pantalla y conecta sus botones. Se llama una sola vez, al arrancar la app.
 export function iniciarPantallaEscaneo() {
   if (pallet) escucharPalletsDe(pallet.fecha);
   else prepararApertura();
@@ -586,12 +622,14 @@ export function iniciarPantallaEscaneo() {
   window.addEventListener('storage', alCambiarEnOtraPestana);
 }
 
+// Se llama al entrar a esta pantalla.
 export function alMostrarEscaneo() {
   visible = true;
   if (pallet) enfocarLector();
   else renovarFecha();
 }
 
+// Se llama al ir a otra pantalla. La cámara se apaga porque nadie la estaría mirando.
 export function alOcultarEscaneo() {
   visible = false;
   if (camaraEncendida) apagarLaCamara();

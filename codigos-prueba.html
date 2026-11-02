@@ -57,6 +57,7 @@
     } else {
       const contenedor = document.getElementById('productos');
 
+      // Dibuja un código de barras adentro de padre. formato es 'EAN13' o 'CODE128'.
       function dibujarCodigo(padre, texto, formato) {
         const lienzo = document.createElement('canvas');
         padre.append(lienzo);

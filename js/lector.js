@@ -15,6 +15,7 @@ const PAUSA_MAXIMA_EN_UNA_LECTURA_MS = 300;
 
 // La pistola funciona como un teclado: escribe el código en el campo que tiene el foco y
 // presiona Enter, que envía el formulario.
+// alLeer recibe el texto tal como llegó, y el campo queda vacío para la lectura siguiente.
 export function escucharPistola(formulario, campo, alLeer) {
   formulario.addEventListener('submit', (evento) => {
     evento.preventDefault();
@@ -34,6 +35,7 @@ export function escucharPistola(formulario, campo, alLeer) {
 
 // Lo que la pistola escribe fuera de un campo se pierde sin que nadie se entere, y su Enter
 // activaría el botón que tenga el foco. Acá se frena ese Enter y se avisa.
+// alPerderse se llama una vez por cada lectura perdida.
 export function detectarLecturaPerdida(alPerderse) {
   let teclas = 0;
   let ultimaTecla = 0;
@@ -61,7 +63,9 @@ export function detectarLecturaPerdida(alPerderse) {
 
 // Mantiene el cursor en el campo de la pistola: si se va, vuelve solo. Devuelve la función
 // que lo vuelve a poner, para usarla cuando el campo reaparece en pantalla.
+// debeTenerFoco es una función que dice si en este momento corresponde poner el cursor.
 export function mantenerFoco(campo, debeTenerFoco) {
+  // Vuelve a poner el cursor si corresponde, sin mover la pantalla.
   const enfocar = () => {
     if (debeTenerFoco()) campo.focus({ preventScroll: true });
   };
@@ -98,19 +102,24 @@ const cajasVistas = new Set();
 let ultimaDeteccion = 0;
 let imagenesSinCodigo = 0;
 
+// Dice si la cámara dejó de ver códigos el tiempo suficiente para que la próxima caja cuente.
 const terminoLaPasada = () => Date.now() - ultimaDeteccion >= TIEMPO_PARA_OTRA_CAJA_MS
   && imagenesSinCodigo >= IMAGENES_SIN_CODIGO;
 
+// Borra la memoria. Se usa al terminar un pallet: la primera caja del siguiente tiene que contar.
 export function olvidarCajasVistas() {
   cajasVistas.clear();
 }
 
 // Después de recargar la memoria está vacía, pero la última caja puede seguir a la vista.
+// caja es el valor que devuelve claveDeCaja para esa caja.
 export function recordarCajaVista(caja) {
   cajasVistas.add(caja);
 }
 
 // claveDeCaja dice qué códigos son de la misma caja: una etiqueta puede traer dos.
+// idContenedor es el id del elemento donde va el video. alLeer recibe el código y devuelve
+// true si la pantalla lo tomó. Si la cámara no enciende, la promesa falla con ese error.
 export async function encenderCamara(idContenedor, alLeer, claveDeCaja) {
   const formatos = Html5QrcodeSupportedFormats;
   const nuevaCamara = new Html5Qrcode(idContenedor, {
@@ -130,6 +139,7 @@ export async function encenderCamara(idContenedor, alLeer, claveDeCaja) {
     experimentalFeatures: { useBarCodeDetectorIfSupported: true },
   });
 
+  // html5-qrcode llama a esta función cada vez que lee un código.
   const alDetectar = (codigo) => {
     // html5-qrcode no cancela una lectura en camino al apagar: esa ya no vale.
     if (camara !== nuevaCamara) return;
@@ -165,6 +175,7 @@ export async function encenderCamara(idContenedor, alLeer, claveDeCaja) {
   imagenesSinCodigo = 0;
 }
 
+// Apaga la cámara y saca el video de la pantalla. Si no estaba encendida, no hace nada.
 export async function apagarCamara() {
   if (!camara) return;
   const camaraEncendida = camara;

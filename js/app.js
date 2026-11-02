@@ -6,6 +6,8 @@ import { iniciarProductos } from './productos.js';
 
 const botonesNavegacion = document.querySelectorAll('[data-pantalla]');
 
+// Muestra una pantalla ("escaneo", "historial" o "productos"), oculta las otras, marca su
+// botón en la barra y le avisa a cada pantalla para que se actualice.
 function irA(pantalla) {
   document.querySelectorAll('.pantalla').forEach((seccion) => {
     seccion.hidden = seccion.id !== `pantalla-${pantalla}`;

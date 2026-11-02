@@ -24,6 +24,7 @@ const resumen = document.getElementById('resumen-dia');
 const lista = document.getElementById('lista-pallets');
 const botonExportar = document.getElementById('btn-exportar');
 
+// Deja de seguir la fecha anterior y empieza a seguir la que está en el campo.
 function escucharFechaElegida() {
   dejarDeEscuchar?.();
   dejarDeEscuchar = null;
@@ -36,6 +37,7 @@ function escucharFechaElegida() {
   }, avisarErrorDeDatos);
 }
 
+// Borra un pallet cerrado, después de preguntar.
 async function eliminar(pallet) {
   const borrar = await confirmar({
     titulo: `¿Borrar el pallet ${pallet.numero}?`,
@@ -46,6 +48,7 @@ async function eliminar(pallet) {
   if (borrar) borrarPallet(pallet.id).catch(avisarErrorDeDatos);
 }
 
+// Arma la tarjeta de un pallet. Tocar la cabecera muestra u oculta su detalle.
 function tarjetaPallet(pallet) {
   const hora = new Date(pallet.cerradoEn)
     .toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
@@ -73,6 +76,7 @@ function tarjetaPallet(pallet) {
   return tarjeta;
 }
 
+// Dibuja el resumen del día y las tarjetas.
 function pintar() {
   const totalCajas = pallets.reduce((suma, pallet) => suma + pallet.totalCajas, 0);
   const totalUnidades = pallets.reduce((suma, pallet) => suma + pallet.totalUnidades, 0);
@@ -97,6 +101,7 @@ function armarFilas() {
   })));
 }
 
+// Baja un Excel con los pallets de la fecha elegida.
 function exportarExcel() {
   if (typeof XLSX === 'undefined') {
     avisar('No se pudo cargar Excel. Revisá la conexión y recargá la página.', 'error');
@@ -109,11 +114,13 @@ function exportarExcel() {
   XLSX.writeFile(libro, `pallets-${campoFecha.value}.xlsx`);
 }
 
+// Conecta el campo de fecha y el botón de Excel. Se llama una sola vez, al arrancar la app.
 export function iniciarPantallaHistorial() {
   campoFecha.addEventListener('change', escucharFechaElegida);
   botonExportar.addEventListener('click', exportarExcel);
 }
 
+// Se llama al entrar a esta pantalla: siempre arranca en el día de hoy.
 export function alMostrarHistorial() {
   campoFecha.value = fechaDeHoy();
   escucharFechaElegida();

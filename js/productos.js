@@ -31,15 +31,19 @@ const campoUnidades = document.getElementById('campo-unidades');
 const camposEnOrden = [campoBarras, campoInterno, campoDescripcion, campoUnidades];
 const mensajeFormulario = document.getElementById('mensaje-formulario');
 
+// Dice si ya llegó la tabla de productos. Antes de eso no se puede buscar.
 export const productosCargados = () => cargados;
 
+// Devuelve el error de la carga, o null si no hubo.
 export const errorAlCargarProductos = () => errorDeCarga;
 
+// Deja un código sin espacios alrededor y en mayúsculas.
 export function normalizarCodigo(texto) {
   return String(texto ?? '').trim().toUpperCase();
 }
 
 // Number() sola aceptaría -5, 2,5 o "Infinity", y "1.200" lo leería como 1,2.
+// Devuelve el número, o 0 si no sirve.
 function unidadesValidas(valor) {
   const texto = String(valor ?? '').trim();
   const numero = /^\d+$/.test(texto) ? Number(texto) : 0;
@@ -63,23 +67,27 @@ function claveDeBusqueda(codigo) {
   return /^\d+$/.test(normalizado) ? normalizado.replace(/^0+/, '') : normalizado;
 }
 
+// Dice si la clave coincide con alguno de los dos códigos del producto.
 function tieneElCodigo(producto, clave) {
   return claveDeBusqueda(producto.codigoInterno) === clave
     || claveDeBusqueda(producto.codigoBarras) === clave;
 }
 
 // Busca por los dos códigos, porque todavía no sabemos cuál traen las cajas.
+// Devuelve el producto, o undefined si no está.
 export function buscarProducto(codigo) {
   const clave = claveDeBusqueda(codigo);
   return clave ? productos.find((producto) => tieneElCodigo(producto, clave)) : undefined;
 }
 
+// Busca otro producto que ya use ese código. idPropio evita encontrarse a sí mismo al editar.
 function productoQueYaUsa(codigo, idPropio) {
   const clave = claveDeBusqueda(codigo);
   if (!clave) return undefined;
   return productos.find((p) => p.id !== idPropio && tieneElCodigo(p, clave));
 }
 
+// Abre el formulario con esos datos. Si el producto trae id es una edición; si no, uno nuevo.
 function abrirFormulario(producto) {
   productoEnEdicion = producto.id ? producto : null;
   document.getElementById('titulo-formulario').textContent =
@@ -96,17 +104,20 @@ function abrirFormulario(producto) {
 
 // Se usa cuando se escanea una caja que no está en la tabla: el formulario se abre con el
 // código ya puesto en el campo que corresponde.
+// alGuardar se llama después de guardar.
 export function agregarProductoConCodigo(codigo, alGuardar) {
   alGuardarFormulario = alGuardar;
   const pareceCodigoDeBarras = /^(\d{8}|\d{12,14})$/.test(codigo);
   abrirFormulario(pareceCodigoDeBarras ? { codigoBarras: codigo } : { codigoInterno: codigo });
 }
 
+// Muestra un mensaje en rojo y deja el formulario abierto.
 function mostrarErrorDeFormulario(mensaje) {
   mensajeFormulario.textContent = mensaje;
   mensajeFormulario.hidden = false;
 }
 
+// Valida el formulario y guarda el producto.
 function guardarFormulario(evento) {
   evento.preventDefault();
   const id = productoEnEdicion?.id;
@@ -136,6 +147,7 @@ function guardarFormulario(evento) {
   else avisar(`${datos.codigoInterno} guardado`);
 }
 
+// Borra un producto, después de preguntar.
 async function eliminar(producto) {
   const borrar = await confirmar({
     titulo: `¿Borrar ${producto.codigoInterno}?`,
@@ -146,6 +158,7 @@ async function eliminar(producto) {
   if (borrar) borrarProducto(producto.id).catch(avisarErrorDeDatos);
 }
 
+// Arma la fila de un producto con sus botones Editar y Borrar.
 function filaProducto(producto) {
   return crear('li', { class: 'fila-producto' },
     crear('div', { class: 'fila-datos' },
@@ -170,6 +183,7 @@ function filaProducto(producto) {
       }, 'Borrar')));
 }
 
+// Dibuja la lista ordenada por código interno, aplicando el texto de Buscar.
 function pintarLista() {
   const filtro = buscador.value.trim().toUpperCase();
   const visibles = productos
@@ -184,6 +198,7 @@ function pintarLista() {
   botonCargarPrueba.hidden = productos.length > 0;
 }
 
+// Guarda los 4 productos de prueba en la base.
 function cargarProductosDePrueba() {
   productosDePrueba.forEach((producto) => guardarProducto(producto).catch(avisarErrorDeDatos));
   avisar('Productos de prueba cargados');
@@ -200,12 +215,14 @@ function pasarAlCampoSiguiente(evento) {
   else senalError();
 }
 
+// Si la tabla no carga, lo avisa y muestra el motivo en la lista.
 function alFallarLaCarga(error) {
   errorDeCarga = error;
   avisarErrorDeDatos(error);
   lista.replaceChildren(crear('li', { class: 'vacio' }, motivoDelError(error)));
 }
 
+// Empieza a seguir la tabla y conecta los botones. Se llama una sola vez, al arrancar la app.
 export function iniciarProductos() {
   escucharProductos((listaNueva) => {
     productos = listaNueva.map(productoCompleto);

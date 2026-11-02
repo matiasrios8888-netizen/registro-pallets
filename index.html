@@ -7,14 +7,12 @@
   <title>Registro de pallets</title>
   <link rel="icon" href="data:,">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="css/estilos.css">
 
-  <!-- Librerías: lector de cámara y exportación a Excel -->
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
+  <!-- Librerías incluidas en el proyecto para que la app abra sin internet:
+       lector de cámara (html5-qrcode 2.3.8) y exportación a Excel (SheetJS 0.20.3) -->
+  <script src="vendor/html5-qrcode.min.js" defer></script>
+  <script src="vendor/xlsx.full.min.js" defer></script>
 
   <!-- Nuestra app. type="module" permite usar import/export entre archivos -->
   <script type="module" src="js/app.js"></script>

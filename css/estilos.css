@@ -5,6 +5,42 @@
   font-display: block;
 }
 
+/* Letras incluidas en el proyecto: la app tiene que verse igual sin internet. */
+@font-face {
+  font-family: 'Barlow';
+  src: url('../fuentes/barlow-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Barlow';
+  src: url('../fuentes/barlow-latin-500-normal.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Barlow';
+  src: url('../fuentes/barlow-latin-600-normal.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Barlow Condensed';
+  src: url('../fuentes/barlow-condensed-latin-600-normal.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Barlow Condensed';
+  src: url('../fuentes/barlow-condensed-latin-700-normal.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
 /* Colores en un solo lugar. Los botones siguen los colores de los pulsadores industriales:
    verde para marcha, rojo para paro. */
 :root {

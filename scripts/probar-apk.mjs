@@ -37,6 +37,23 @@ async function leerConPistola(codigo) {
   await consola(`input keyboard text ${codigo}`);
   await consola('input keyboard keyevent 66');
   await esperar(500);
+  const resultado = await pagina.evaluate(() => ({
+    campo: document.getElementById('campo-lector').value,
+    inputmode: document.getElementById('campo-lector').inputMode,
+    foco: document.activeElement.id,
+    titulo: document.getElementById('lectura-titulo').textContent,
+    detalle: document.getElementById('lectura-detalle').textContent,
+    cajas: document.getElementById('contador').textContent,
+  }));
+  const teclado = /mInputShown=true/.test(await consola('dumpsys input_method'));
+  console.log('lectura', codigo, JSON.stringify(resultado), 'teclado de pantalla:', teclado);
+}
+
+// Abre un pallet con ese responsable y espera a que el campo de la pistola tenga el foco.
+async function abrirPallet(responsable) {
+  await pagina.locator('#apertura-responsable').fill(responsable);
+  await pagina.getByRole('button', { name: 'Abrir pallet' }).click();
+  await esperar(800);
 }
 
 await dispositivo.installApk(APK);
@@ -68,9 +85,22 @@ comprobar('están las librerías', entorno.camara === 'function' && entorno.exce
 comprobar('número sugerido 1', entorno.numero === '1');
 await captura('1-abrir');
 
-await pagina.locator('#apertura-responsable').fill('Prueba');
-await pagina.getByRole('button', { name: 'Abrir pallet' }).click();
+// Primera tanda con el teclado de pantalla instalado, solo para ver qué hace. Una pistola
+// Bluetooth es un teclado físico y Android no abre el de pantalla, salvo que el celular lo pida.
+await abrirPallet('Diagnostico');
+console.log('metodos de entrada:', (await consola('ime list -s')).trim().replace(/\s+/g, ' '));
+for (const codigo of ['KD0324', '2000324000012', 'TC0110', '2000324000012']) await leerConPistola(codigo);
+await captura('2a-con-teclado-de-pantalla');
+await pagina.locator('#btn-descartar').click();
+await esperar(500);
+await pagina.locator('#confirmar-si').click();
 await esperar(800);
+
+for (const metodo of (await consola('ime list -s')).trim().split(/\s+/)) await consola(`ime disable ${metodo}`);
+await esperar(1000);
+console.log('sin teclado de pantalla:', (await consola('ime list -s')).trim() || 'ninguno');
+
+await abrirPallet('Prueba');
 const lector = await pagina.evaluate(() => ({
   foco: document.activeElement.id,
   listo: document.getElementById('form-lector').dataset.listo,
@@ -116,6 +146,15 @@ const camara = await pagina.evaluate(() => {
   };
 });
 comprobar('la cámara enciende', camara.boton === 'Apagar cámara' && camara.vivas === 1 && camara.ancho > 0, JSON.stringify(camara));
+const alLeer = await pagina.evaluate(() => {
+  const borde = (selector) => {
+    const r = document.querySelector(selector).getBoundingClientRect();
+    return [Math.round(r.top), Math.round(r.bottom)];
+  };
+  return { tablero: borde('#tablero'), visor: borde('.visor-camara'), barra: borde('.navegacion'), alto: innerHeight };
+});
+console.log('camara encendida', JSON.stringify(alLeer));
+comprobar('se ven juntos el contador y el visor', alLeer.tablero[0] >= -60 && alLeer.visor[1] <= alLeer.barra[0] + 20, JSON.stringify(alLeer));
 await captura('4-camara');
 await pagina.locator('#btn-camara').click();
 await esperar(1000);

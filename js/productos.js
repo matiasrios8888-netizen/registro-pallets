@@ -1,7 +1,14 @@
 // La tabla de productos: cómo se busca un producto por su código y la pantalla "Productos".
 import { borrarProducto, escucharProductos, guardarProducto } from './datos.js';
 import { productosDePrueba } from './datos-prueba.js';
-import { avisar, avisarErrorDeDatos, confirmar, crear, unidades } from './ui.js';
+import {
+  avisar,
+  avisarErrorDeDatos,
+  confirmar,
+  crear,
+  senalError,
+  unidades,
+} from './ui.js';
 
 let productos = [];
 let cargados = false;
@@ -72,6 +79,11 @@ export function agregarProductoConCodigo(codigo, alGuardar) {
   abrirFormulario(pareceCodigoDeBarras ? { codigoBarras: codigo } : { codigoInterno: codigo });
 }
 
+function mostrarErrorDeFormulario(mensaje) {
+  mensajeFormulario.textContent = mensaje;
+  mensajeFormulario.hidden = false;
+}
+
 function guardarFormulario(evento) {
   evento.preventDefault();
   const id = productoEnEdicion?.id;
@@ -82,11 +94,16 @@ function guardarFormulario(evento) {
     unidadesPorCaja: Number(campoUnidades.value),
   };
 
+  // required acepta un campo con solo espacios, y recién acá quedan vacíos.
+  if (!datos.codigoInterno || !datos.descripcion) {
+    mostrarErrorDeFormulario('Faltan el código interno o la descripción.');
+    return;
+  }
+
   // Dos productos con el mismo código harían que la búsqueda elija cualquiera de los dos.
   const repetido = productoQueYaUsa(datos.codigoInterno, id) ?? productoQueYaUsa(datos.codigoBarras, id);
   if (repetido) {
-    mensajeFormulario.textContent = `Ese código ya lo usa ${repetido.codigoInterno}: ${repetido.descripcion}.`;
-    mensajeFormulario.hidden = false;
+    mostrarErrorDeFormulario(`Ese código ya lo usa ${repetido.codigoInterno}: ${repetido.descripcion}.`);
     return;
   }
 
@@ -150,13 +167,14 @@ function cargarProductosDePrueba() {
 }
 
 // Con la pistola, el Enter del final del código pasa al campo siguiente en vez de guardar.
-// Así se puede escanear una caja adentro del formulario sin que se guarde a medias.
+// Así se puede escanear una caja adentro del formulario sin que se guarde a medias. Tampoco
+// guarda en el último campo: seguir escaneando no puede guardar un producto mal cargado.
 function pasarAlCampoSiguiente(evento) {
   if (evento.key !== 'Enter' || !evento.target.matches('input')) return;
   evento.preventDefault();
   const siguiente = camposEnOrden[camposEnOrden.indexOf(evento.target) + 1];
   if (siguiente) siguiente.focus();
-  else formulario.requestSubmit();
+  else senalError();
 }
 
 export function iniciarProductos() {
@@ -167,6 +185,10 @@ export function iniciarProductos() {
   }, avisarErrorDeDatos);
 
   buscador.addEventListener('input', pintarLista);
+  // Con la pistola: el texto queda seleccionado y la lectura siguiente lo reemplaza.
+  buscador.addEventListener('keydown', (evento) => {
+    if (evento.key === 'Enter') buscador.select();
+  });
   botonCargarPrueba.addEventListener('click', cargarProductosDePrueba);
   document.getElementById('btn-nuevo-producto').addEventListener('click', () => {
     alGuardarFormulario = null;

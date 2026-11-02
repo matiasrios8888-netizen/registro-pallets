@@ -1,0 +1,15 @@
+rules_version = '2';
+
+// Reglas para la etapa de prueba: cualquiera que tenga el link puede leer y escribir, y solo
+// en las dos colecciones que usa la app. Dejan de funcionar el 1 de febrero de 2027 a propósito,
+// para que esta base abierta no quede olvidada.
+//
+// Antes de cargar datos reales hay que agregar inicio de sesión y cambiar estas reglas.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{coleccion}/{id} {
+      allow read, write: if coleccion in ['productos', 'pallets']
+        && request.time < timestamp.date(2027, 2, 1);
+    }
+  }
+}

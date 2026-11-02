@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#15262F">
+  <title>Registro de pallets</title>
+  <link rel="icon" href="data:,">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="css/estilos.css">
+
+  <!-- Librerías: lector de cámara y exportación a Excel -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
+
+  <!-- Nuestra app. type="module" permite usar import/export entre archivos -->
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <p id="error-arranque" class="banner banner-error" hidden>No se pudo conectar. Revisá el wifi y recargá la página.</p>
+  <p id="banner-modo-prueba" class="banner" hidden>Modo prueba: los datos quedan solo en este dispositivo.</p>
+
+  <main>
+    <!-- Pantalla 1: abrir el pallet y escanear caja por caja -->
+    <section id="pantalla-escaneo" class="pantalla">
+
+      <!-- Paso 1: sin pallet abierto se ve este formulario -->
+      <div id="vista-apertura" class="vista-apertura">
+        <h1>Abrir pallet</h1>
+        <form id="form-apertura">
+          <label class="campo" for="apertura-numero">Número de pallet
+            <input id="apertura-numero" type="number" min="1" step="1" inputmode="numeric" required>
+          </label>
+          <p class="ayuda-campo">Se completa solo con el siguiente. Si querés otro, cambialo.</p>
+          <label class="campo" for="apertura-fecha">Fecha
+            <input id="apertura-fecha" type="date" required>
+          </label>
+          <label class="campo" for="apertura-responsable">Responsable
+            <input id="apertura-responsable" required autocomplete="off">
+          </label>
+          <p id="mensaje-apertura" class="mensaje-error" hidden></p>
+          <button type="submit" class="boton boton-marcha">Abrir pallet</button>
+        </form>
+      </div>
+
+      <!-- Paso 2: con el pallet abierto se ve el escaneo -->
+      <div id="vista-escaneo" class="escaneo" hidden>
+        <div class="columna">
+          <div id="tablero" class="tablero" data-estado="espera">
+            <div class="tablero-cabecera">
+              <p id="tablero-titulo" class="tablero-titulo"></p>
+              <p id="tablero-datos" class="tablero-datos"></p>
+            </div>
+            <div class="contador">
+              <span id="contador-apagado" class="contador-apagado" aria-hidden="true">888</span>
+              <span id="contador" class="contador-encendido">0</span>
+            </div>
+            <p class="tablero-totales">
+              <span id="total-unidades"></span>
+              <span>cajas</span>
+            </p>
+            <div class="lectura" aria-live="assertive">
+              <p id="lectura-titulo" class="lectura-titulo">Escaneá la primera caja</p>
+              <p id="lectura-detalle" class="lectura-detalle"></p>
+            </div>
+            <button id="btn-agregar-codigo" type="button" class="boton boton-sobre-rojo" hidden>Agregar a Productos</button>
+          </div>
+
+          <!-- Este campo siempre tiene el foco: la pistola escribe acá y presiona Enter -->
+          <form id="form-lector" class="form-lector" data-listo="false">
+            <label for="campo-lector" class="etiqueta-lector">
+              <span class="lector-listo">Lector listo</span>
+              <span class="lector-sin-foco">Tocá acá para volver a leer</span>
+            </label>
+            <div class="campo-con-boton">
+              <input id="campo-lector" inputmode="none" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" placeholder="Código">
+              <button type="submit" class="boton boton-tablero">Sumar</button>
+            </div>
+          </form>
+
+          <button id="btn-deshacer" type="button" class="boton boton-secundario" disabled>Deshacer último escaneo</button>
+
+          <div id="marco-camara" class="marco-camara" hidden>
+            <div id="camara"></div>
+            <p class="ayuda-camara">Apuntá al código de una caja. Para contar otra caja igual, sacá la cámara un momento y volvé a apuntar.</p>
+          </div>
+
+          <div class="dos-botones">
+            <button id="btn-camara" type="button" class="boton boton-secundario">Usar cámara</button>
+            <button id="btn-escribir" type="button" class="boton boton-secundario solo-tactil">Escribir a mano</button>
+          </div>
+        </div>
+
+        <div class="columna">
+          <ul id="lista-items" class="lista items"></ul>
+          <div class="acciones">
+            <button id="btn-cerrar" type="button" class="boton boton-marcha" disabled>Cerrar pallet</button>
+            <button id="btn-descartar" type="button" class="boton boton-secundario">Descartar pallet</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pantalla 2: pallets cerrados de un día, su detalle y exportación a Excel -->
+    <section id="pantalla-historial" class="pantalla" hidden>
+      <h1>Historial</h1>
+      <label class="campo" for="fecha-historial">Fecha
+        <input id="fecha-historial" type="date">
+      </label>
+      <p id="resumen-dia" class="resumen"></p>
+      <button id="btn-exportar" type="button" class="boton boton-tablero">Exportar a Excel</button>
+      <div id="lista-pallets" class="lista-pallets"></div>
+    </section>
+
+    <!-- Pantalla 3: tabla de productos -->
+    <section id="pantalla-productos" class="pantalla" hidden>
+      <h1>Productos</h1>
+      <button id="btn-nuevo-producto" type="button" class="boton boton-tablero">Agregar producto</button>
+      <button id="btn-cargar-prueba" type="button" class="boton boton-secundario" hidden>Cargar productos de prueba</button>
+      <label class="campo" for="buscar-producto">Buscar
+        <input id="buscar-producto" type="search" autocomplete="off" placeholder="Código o descripción">
+      </label>
+      <ul id="lista-productos" class="lista"></ul>
+    </section>
+  </main>
+
+  <nav class="navegacion" aria-label="Pantallas">
+    <button type="button" data-pantalla="escaneo" aria-current="page">Escanear</button>
+    <button type="button" data-pantalla="historial">Historial</button>
+    <button type="button" data-pantalla="productos">Productos</button>
+  </nav>
+
+  <div id="aviso" class="aviso" role="status" hidden></div>
+
+  <!-- Ventana para el resumen final y para preguntar antes de borrar algo -->
+  <dialog id="dialogo-confirmar" class="dialogo">
+    <form method="dialog">
+      <h2 id="confirmar-titulo"></h2>
+      <p id="confirmar-detalle"></p>
+      <div id="confirmar-contenido" class="confirmar-contenido"></div>
+      <div class="dos-botones">
+        <button id="confirmar-no" value="no" class="boton boton-secundario"></button>
+        <button id="confirmar-si" value="si" class="boton"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Ventana para agregar o editar un producto -->
+  <dialog id="dialogo-producto" class="dialogo">
+    <form id="form-producto">
+      <h2 id="titulo-formulario">Agregar producto</h2>
+      <label class="campo" for="campo-barras">Código de barras (si tiene)
+        <input id="campo-barras" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="campo" for="campo-interno">Código interno
+        <input id="campo-interno" required autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KD0324">
+      </label>
+      <label class="campo" for="campo-descripcion">Descripción
+        <input id="campo-descripcion" required autocomplete="off">
+      </label>
+      <label class="campo" for="campo-unidades">Unidades por caja
+        <input id="campo-unidades" type="number" min="1" step="1" inputmode="numeric" required>
+      </label>
+      <p id="mensaje-formulario" class="mensaje-error" hidden></p>
+      <div class="dos-botones">
+        <button id="btn-cancelar-producto" type="button" class="boton boton-secundario">Cancelar</button>
+        <button type="submit" class="boton boton-marcha">Guardar producto</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

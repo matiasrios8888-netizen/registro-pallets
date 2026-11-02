@@ -32,6 +32,8 @@ import {
 const CLAVE_PALLET_ABIERTO = 'registro-pallets.pallet-abierto';
 const CLAVE_RESPONSABLE = 'registro-pallets.responsable';
 const DURACION_VERDE_MS = 1200;
+const DIAS_DE_MARGEN_EN_LA_FECHA = 31;
+const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
 // El pallet que se está armando: { numero, fecha, responsable, lecturas }. Cada lectura es
 // una caja. Se guarda en el dispositivo a cada lectura: si se recarga la página o se apaga
@@ -49,6 +51,7 @@ let palletsDeLaFecha = [];
 let fechaEscuchada = null;
 let dejarDeEscuchar = null;
 let numeroEscritoAMano = false;
+let fechaSugerida = null;
 
 const vistaApertura = document.getElementById('vista-apertura');
 const vistaEscaneo = document.getElementById('vista-escaneo');
@@ -57,7 +60,6 @@ const formularioApertura = document.getElementById('form-apertura');
 const campoNumero = document.getElementById('apertura-numero');
 const campoFecha = document.getElementById('apertura-fecha');
 const campoResponsable = document.getElementById('apertura-responsable');
-const camposDeApertura = [campoNumero, campoFecha, campoResponsable];
 const mensajeApertura = document.getElementById('mensaje-apertura');
 
 const tablero = document.getElementById('tablero');
@@ -120,11 +122,18 @@ function escucharPalletsDe(fecha) {
 // Deja el formulario listo con fecha de hoy, número automático y el último responsable.
 function prepararApertura() {
   numeroEscritoAMano = false;
-  campoFecha.value = fechaDeHoy();
+  fechaSugerida = fechaDeHoy();
+  campoFecha.value = fechaSugerida;
   campoResponsable.value = localStorage.getItem(CLAVE_RESPONSABLE) ?? '';
   mensajeApertura.hidden = true;
   escucharPalletsDe(campoFecha.value);
   completarNumeroAutomatico();
+}
+
+// Si la app queda abierta de un día para el otro, el formulario no puede seguir proponiendo
+// la fecha de ayer. Una fecha elegida a mano se respeta.
+function renovarFecha() {
+  if (!pallet && campoFecha.value === fechaSugerida && fechaSugerida !== fechaDeHoy()) prepararApertura();
 }
 
 function mostrarErrorDeApertura(mensaje) {
@@ -132,11 +141,21 @@ function mostrarErrorDeApertura(mensaje) {
   mensajeApertura.hidden = false;
 }
 
+// Una lectura con el cursor en Fecha deja años como 0004.
+function fechaCercana(fecha) {
+  const distancia = Math.abs(new Date(`${fecha}T12:00`) - new Date(`${fechaDeHoy()}T12:00`));
+  return distancia / MS_POR_DIA <= DIAS_DE_MARGEN_EN_LA_FECHA;
+}
+
 function abrirPallet(evento) {
   evento.preventDefault();
   const numero = Number(campoNumero.value);
   const responsable = campoResponsable.value.trim();
 
+  if (!fechaCercana(campoFecha.value)) {
+    mostrarErrorDeApertura(`Revisá la fecha: está a más de ${DIAS_DE_MARGEN_EN_LA_FECHA} días de hoy.`);
+    return;
+  }
   if (numeroOcupado(numero)) {
     mostrarErrorDeApertura(`Ya hay un pallet ${numero} con esa fecha.`);
     return;
@@ -145,8 +164,9 @@ function abrirPallet(evento) {
     mostrarErrorDeApertura('Falta el responsable.');
     return;
   }
-  // Pasa si alguien escanea una caja con el cursor en este campo.
-  if (buscarProducto(responsable)) {
+  // Pasa si alguien escanea una caja con el cursor en este campo. Cuatro cifras seguidas no
+  // aparecen en un nombre, y están en cualquier código, aunque no esté en Productos.
+  if (/\d{4}/.test(responsable)) {
     mostrarErrorDeApertura('En Responsable quedó un código de caja. Escribí el nombre.');
     return;
   }
@@ -158,6 +178,7 @@ function abrirPallet(evento) {
   pintarPantalla();
   mostrarEnTablero('espera', 'Escaneá la primera caja');
   enfocarLector();
+  window.scrollTo(0, 0);
 }
 
 // La pistola termina cada lectura con Enter. Si se escanea antes de abrir el pallet, ese
@@ -165,9 +186,7 @@ function abrirPallet(evento) {
 function noAbrirConEnter(evento) {
   if (evento.key !== 'Enter') return;
   evento.preventDefault();
-  if (evento.target.matches('input')) {
-    camposDeApertura[camposDeApertura.indexOf(evento.target) + 1]?.focus();
-  }
+  senalError();
 }
 
 function filaItem(item) {
@@ -418,12 +437,17 @@ export function iniciarPantallaEscaneo() {
   formularioApertura.addEventListener('submit', abrirPallet);
   formularioApertura.addEventListener('keydown', noAbrirConEnter);
   campoNumero.addEventListener('input', () => {
-    numeroEscritoAMano = true;
+    numeroEscritoAMano = campoNumero.value !== '';
+    mensajeApertura.hidden = true;
   });
   campoFecha.addEventListener('change', () => {
+    mensajeApertura.hidden = true;
     escucharPalletsDe(campoFecha.value);
     completarNumeroAutomatico();
   });
+  // Una PC siempre prendida nunca cambia de foco; un celular suspendido frena los temporizadores.
+  setInterval(renovarFecha, 60000);
+  document.addEventListener('visibilitychange', renovarFecha);
 
   escucharPistola(formularioLector, campoLector, (texto) => {
     volverAModoPistola();
@@ -449,7 +473,7 @@ export function iniciarPantallaEscaneo() {
 export function alMostrarEscaneo() {
   visible = true;
   if (pallet) enfocarLector();
-  else prepararApertura();
+  else renovarFecha();
 }
 
 export function alOcultarEscaneo() {

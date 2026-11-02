@@ -2,6 +2,7 @@
 import { escucharPallets, guardarPallet } from './datos.js';
 import {
   apagarCamara,
+  detectarLecturaPerdida,
   encenderCamara,
   escucharPistola,
   mantenerFoco,
@@ -346,8 +347,8 @@ function agregarCodigoDesconocido() {
 // En el celular, inputmode="none" evita que el teclado de pantalla tape todo mientras el
 // campo tiene el foco. Este botón lo habilita para escribir un código a mano.
 function escribirAMano() {
-  campoLector.inputMode = 'text';
   campoLector.blur();
+  campoLector.inputMode = 'text';
   campoLector.focus();
 }
 
@@ -427,6 +428,13 @@ export function iniciarPantallaEscaneo() {
   escucharPistola(formularioLector, campoLector, (texto) => {
     volverAModoPistola();
     procesarCodigo(texto);
+  });
+  campoLector.addEventListener('blur', () => {
+    campoLector.inputMode = 'none';
+  });
+  detectarLecturaPerdida(() => {
+    senalError();
+    avisar(`Esa lectura no se contó: ${pallet ? 'volvé a Escanear' : 'primero abrí el pallet'}.`, 'error');
   });
 
   botonDeshacer.addEventListener('click', deshacerUltimoEscaneo);

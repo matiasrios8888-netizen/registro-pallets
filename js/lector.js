@@ -9,6 +9,9 @@ const TIEMPO_PARA_OTRA_CAJA_MS = 1500;
 // pasar 1,5 s entre dos lecturas de un código que nunca salió de la vista.
 const IMAGENES_SIN_CODIGO = 3;
 
+// Menos teclas que esto no son una lectura: pueden ser alguien usando el teclado.
+const TECLAS_DE_UNA_LECTURA = 3;
+
 // La pistola funciona como un teclado: escribe el código en el campo que tiene el foco y
 // presiona Enter, que envía el formulario.
 export function escucharPistola(formulario, campo, alLeer) {
@@ -26,6 +29,26 @@ export function escucharPistola(formulario, campo, alLeer) {
       formulario.requestSubmit();
     }
   });
+}
+
+// Lo que la pistola escribe fuera de un campo se pierde sin que nadie se entere, y su Enter
+// activaría el botón que tenga el foco. Acá se frena ese Enter y se avisa.
+export function detectarLecturaPerdida(alPerderse) {
+  let teclas = 0;
+  // true: nos enteramos antes que el botón que tiene el foco.
+  document.addEventListener('keydown', (evento) => {
+    if (evento.target.closest('input, dialog')) {
+      teclas = 0;
+    } else if (evento.key.length === 1) {
+      teclas += 1;
+    } else if (evento.key === 'Enter' || evento.key === 'Tab') {
+      if (teclas >= TECLAS_DE_UNA_LECTURA) {
+        evento.preventDefault();
+        alPerderse();
+      }
+      teclas = 0;
+    }
+  }, true);
 }
 
 // Mantiene el cursor en el campo de la pistola: si se va, vuelve solo. Devuelve la función

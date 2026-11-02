@@ -121,7 +121,7 @@ export function confirmar({ titulo, detalle = '', contenido = null, si, no = 'Ca
 
 // Si alguien escanea con esta pregunta abierta, el Enter de la pistola no debe contestarla.
 document.getElementById('dialogo-confirmar').addEventListener('keydown', (evento) => {
-  if (evento.key === 'Enter') {
+  if (evento.key === 'Enter' && !evento.defaultPrevented) {
     evento.preventDefault();
     senalError();
   }

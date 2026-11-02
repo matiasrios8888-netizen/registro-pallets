@@ -7,6 +7,7 @@ import {
   escucharPistola,
   mantenerFoco,
   olvidarCajasVistas,
+  recordarCajaVista,
 } from './lector.js';
 import {
   agregarProductoConCodigo,
@@ -457,7 +458,9 @@ async function encenderLaCamara() {
   marcoCamara.hidden = false;
   try {
     await encenderCamara('camara', (codigo) => {
-      if (visible && !document.querySelector('dialog[open]')) procesarCodigo(codigo);
+      if (!visible || document.querySelector('dialog[open]')) return false;
+      procesarCodigo(codigo);
+      return true;
     }, (codigo) => buscarProducto(codigo)?.codigoInterno ?? codigo);
     camaraEncendida = true;
     anchoDeLaCamara = document.documentElement.clientWidth;
@@ -484,7 +487,8 @@ async function apagarLaCamara() {
 // si no, el video queda del ancho viejo y el recuadro de lectura queda corrido.
 async function reiniciarCamaraSiCambioElAncho() {
   if (!camaraEncendida || document.documentElement.clientWidth === anchoDeLaCamara) return;
-  await apagarLaCamara();
+  // Apagarla recién prendida puede fallar: igual hay que volver a encenderla.
+  await apagarLaCamara().catch(console.error);
   await encenderLaCamara();
 }
 
@@ -495,6 +499,7 @@ function alCambiarEnOtraPestana(evento) {
   if (pallet) {
     escucharPalletsDe(pallet.fecha);
   } else {
+    olvidarCajasVistas();
     if (camaraEncendida) apagarLaCamara();
     prepararApertura();
   }
@@ -507,6 +512,7 @@ export function iniciarPantallaEscaneo() {
   else prepararApertura();
   pintarPantalla();
   if (pallet?.lecturas.length) mostrarEnTablero('espera', 'Escaneá la siguiente caja');
+  if (pallet?.lecturas.length) recordarCajaVista(pallet.lecturas.at(-1).codigoInterno);
   devolverPalletRechazado();
   enfocarLector();
 

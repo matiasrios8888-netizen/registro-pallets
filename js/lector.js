@@ -90,8 +90,16 @@ const cajasVistas = new Set();
 let ultimaDeteccion = 0;
 let imagenesSinCodigo = 0;
 
+const terminoLaPasada = () => Date.now() - ultimaDeteccion >= TIEMPO_PARA_OTRA_CAJA_MS
+  && imagenesSinCodigo >= IMAGENES_SIN_CODIGO;
+
 export function olvidarCajasVistas() {
   cajasVistas.clear();
+}
+
+// Después de recargar la memoria está vacía, pero la última caja puede seguir a la vista.
+export function recordarCajaVista(caja) {
+  cajasVistas.add(caja);
 }
 
 // claveDeCaja dice qué códigos son de la misma caja: una etiqueta puede traer dos.
@@ -115,23 +123,25 @@ export async function encenderCamara(idContenedor, alLeer, claveDeCaja) {
   });
 
   const alDetectar = (codigo) => {
-    const ahora = Date.now();
-    const terminoLaPasada = ahora - ultimaDeteccion >= TIEMPO_PARA_OTRA_CAJA_MS
-      && imagenesSinCodigo >= IMAGENES_SIN_CODIGO;
-    if (terminoLaPasada) cajasVistas.clear();
-    ultimaDeteccion = ahora;
+    // html5-qrcode no cancela una lectura en camino al apagar: esa ya no vale.
+    if (camara !== nuevaCamara) return;
+    if (terminoLaPasada()) cajasVistas.clear();
+    ultimaDeteccion = Date.now();
     imagenesSinCodigo = 0;
 
     const caja = claveDeCaja(codigo);
     if (cajasVistas.has(caja)) return;
-    cajasVistas.add(caja);
-    alLeer(codigo);
+    // alLeer dice si la pantalla la tomó: con una pregunta abierta no, y tiene que poder
+    // contarse apenas se cierre.
+    if (alLeer(codigo)) cajasVistas.add(caja);
   };
 
   await nuevaCamara.start(
     { facingMode: 'environment' }, // la cámara de atrás
     {
       fps: 10,
+      // Un video vertical ocuparía toda la pantalla y dejaría el tablero afuera.
+      aspectRatio: 4 / 3,
       // Recuadro ancho y bajo, con la forma de un código de barras.
       qrbox: (ancho, alto) => ({
         width: Math.max(Math.floor(ancho * 0.9), 50),
@@ -151,6 +161,7 @@ export async function apagarCamara() {
   if (!camara) return;
   const camaraEncendida = camara;
   camara = null;
+  if (terminoLaPasada()) cajasVistas.clear();
   await camaraEncendida.stop();
   camaraEncendida.clear();
 }

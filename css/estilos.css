@@ -388,6 +388,20 @@ h2 {
   color: #fff;
 }
 
+/* Android suele entregar el video vertical, que taparía el tablero. Se recorta arriba y abajo:
+   el recuadro de lectura queda centrado, así que se sigue viendo. */
+.visor-camara {
+  display: flex;
+  align-items: center;
+  max-height: 70vw;
+  overflow: hidden;
+}
+
+#camara {
+  flex: none;
+  width: 100%;
+}
+
 .ayuda-camara {
   margin: 0;
   padding: 10px 16px 14px;

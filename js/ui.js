@@ -35,6 +35,12 @@ export function fechaDeHoy() {
 // De "2026-11-01" a "01/11/2026".
 export const fechaParaMostrar = (fecha) => fecha.split('-').reverse().join('/');
 
+// Aclara cómo se contaron las cajas que no se escanearon. Vacío si se escanearon todas.
+export function notaPorFilas(item) {
+  const texto = item.detalleFilas ? `Por filas: ${item.detalleFilas}` : '';
+  return crear('span', { class: 'nota-por-filas' }, texto);
+}
+
 // Tabla de productos de un pallet. Se usa en el resumen final y en el historial.
 export function tablaDeItems(items) {
   return crear('table', { class: 'tabla-items' },
@@ -47,7 +53,7 @@ export function tablaDeItems(items) {
     crear('tbody', {}, ...items.map((item) => (
       crear('tr', {},
         crear('td', { class: 'codigo' }, item.codigoInterno),
-        crear('td', {}, item.descripcion),
+        crear('td', {}, item.descripcion, notaPorFilas(item)),
         crear('td', { class: 'numero' }, formatearNumero(item.cajas)),
         crear('td', { class: 'numero' }, formatearNumero(item.unidades)))))));
 }

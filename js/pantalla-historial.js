@@ -98,6 +98,7 @@ function armarFilas() {
     Descripción: item.descripcion,
     Cajas: item.cajas,
     Unidades: item.unidades,
+    'Cajas por fila × filas': item.detalleFilas ?? '',
   })));
 }
 
@@ -117,8 +118,13 @@ function exportarExcel() {
     avisar('No se pudo cargar Excel. Recargá la página.', 'error');
     return;
   }
-  const hoja = XLSX.utils.json_to_sheet(armarFilas());
-  hoja['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 22 }, { wch: 12 }, { wch: 40 }, { wch: 8 }, { wch: 10 }];
+  const filas = armarFilas();
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  // La columna se ajusta a la descripción más larga: la celda de al lado la cortaría.
+  const anchoDescripcion = Math.max(40, ...filas.map((fila) => fila.Descripción.length));
+  hoja['!cols'] = [
+    { wch: 12 }, { wch: 8 }, { wch: 22 }, { wch: 12 }, { wch: anchoDescripcion }, { wch: 8 }, { wch: 10 }, { wch: 22 },
+  ];
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, 'Pallets');
   const nombre = `pallets-${campoFecha.value}.xlsx`;

@@ -6,8 +6,8 @@ import {
   encenderCamara,
   escucharPistola,
   mantenerFoco,
-  olvidarCajasVistas,
-  recordarCajaVista,
+  mensajeDeCamara,
+  motivoSinCamara,
 } from './lector.js';
 import {
   agregarProductoConCodigo,
@@ -25,6 +25,7 @@ import {
   fechaDeHoy,
   fechaParaMostrar,
   motivoDelError,
+  notaPorFilas,
   senalError,
   senalOk,
   tablaDeItems,
@@ -34,8 +35,14 @@ import {
 const CLAVE_PALLET_ABIERTO = 'registro-pallets.pallet-abierto';
 const CLAVE_RESPONSABLE = 'registro-pallets.responsable';
 const CLAVE_RECHAZADOS = 'registro-pallets.pallets-rechazados';
+const CLAVE_MODO_CAMARA = 'registro-pallets.modo-camara';
 const DURACION_VERDE_MS = 1200;
 const ESPERA_ENTRE_QUITAS_MS = 400;
+const ESPERA_ENTRE_TOQUES_DE_LEER_MS = 400;
+const TIEMPO_PARA_LEER_MS = 8000;
+const ESPERA_PARA_PEDIR_QUE_SE_ACERQUE_MS = 2000;
+const ESPERA_EN_MODO_RAPIDO_MS = 2000;
+const MAXIMO_CAJAS_POR_FILAS = 999;
 const ALTO_BARRA_INFERIOR = 100;
 const DIAS_DE_MARGEN_EN_LA_FECHA = 31;
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
@@ -51,6 +58,20 @@ let codigoDesconocido = null;
 let temporizadorVerde;
 let ultimaQuita = 0;
 let anchoDeLaCamara = 0;
+
+// Hay una lectura pedida con el botón Leer mientras este temporizador no sea null.
+let temporizadorLeer = null;
+let ultimoToqueDeLeer = 0;
+
+// Modo rápido: la cámara cuenta sola, sin tocar Leer.
+let modoRapido = localStorage.getItem(CLAVE_MODO_CAMARA) === 'rapido';
+let ultimaVezQueVioUnCodigo = 0;
+let ultimaCajaContada = null;
+let momentoDeLaUltimaCaja = 0;
+
+// Contar por filas: la próxima lectura no suma, solo dice de qué producto son las cajas.
+let esperandoCajaDeFilas = false;
+let productoDeFilas = null;
 
 // Pallets ya cerrados en la fecha elegida: para saber qué número le toca al siguiente.
 let palletsDeLaFecha = [];
@@ -81,9 +102,23 @@ const botonAgregarCodigo = document.getElementById('btn-agregar-codigo');
 const formularioLector = document.getElementById('form-lector');
 const campoLector = document.getElementById('campo-lector');
 const botonDeshacer = document.getElementById('btn-deshacer');
+const botonFilas = document.getElementById('btn-filas');
+const dialogoFilas = document.getElementById('dialogo-filas');
+const formularioFilas = document.getElementById('form-filas');
+const campoCajasPorFila = document.getElementById('filas-cajas');
+const campoFilas = document.getElementById('filas-cantidad');
+const cuentaDeFilas = document.getElementById('filas-cuenta');
+const botonSumarFilas = document.getElementById('btn-sumar-filas');
 const botonCamara = document.getElementById('btn-camara');
 const marcoCamara = document.getElementById('marco-camara');
+const botonLeer = document.getElementById('btn-leer');
+const botonModoTocar = document.getElementById('btn-modo-tocar');
+const botonModoRapido = document.getElementById('btn-modo-rapido');
+const cartelAcercarse = document.getElementById('cartel-acercarse');
+const avisoRapido = document.getElementById('aviso-rapido');
+const resumenPallet = document.getElementById('resumen-pallet');
 const listaItems = document.getElementById('lista-items');
+const botonSeguirCamara = document.getElementById('btn-seguir-camara');
 const botonCerrar = document.getElementById('btn-cerrar');
 
 const enfocarLector = mantenerFoco(campoLector, () => (
@@ -101,17 +136,33 @@ function guardarPalletAbierto() {
 const claveDeFila = ({ codigoInterno, descripcion, unidadesPorCaja }) => (
   `${codigoInterno}|${descripcion}|${unidadesPorCaja}`);
 
+// Arma la guía para volver a controlar un pallet: "8 × 5" son 5 filas de 8 cajas, y "8 × 5 − 1"
+// dice que después se quitó una. Un conteo de la versión anterior no guardó las filas.
+function detalleDeBloques(bloques) {
+  return [...bloques.values()].map(({ quedan, cajasPorFila = quedan, filas = 1 }) => {
+    const quitadas = cajasPorFila * filas - quedan;
+    return `${cajasPorFila} × ${filas}${quitadas > 0 ? ` − ${quitadas}` : ''}`;
+  }).join(' + ');
+}
+
 // Convierte las lecturas, una por caja, en filas con sus totales de cajas y unidades.
+// detalleFilas dice cómo se contaron las cajas que no se escanearon.
 function agruparPorProducto(lecturas) {
   const grupos = new Map();
-  for (const lectura of lecturas) {
+  for (const { bloque, cajasPorFila, filas, ...lectura } of lecturas) {
     const clave = claveDeFila(lectura);
-    const grupo = grupos.get(clave) ?? { ...lectura, cajas: 0, unidades: 0 };
+    const grupo = grupos.get(clave) ?? { ...lectura, cajas: 0, unidades: 0, bloques: new Map() };
     grupo.cajas += 1;
     grupo.unidades += lectura.unidadesPorCaja;
+    if (bloque) {
+      const datos = grupo.bloques.get(bloque) ?? { cajasPorFila, filas, quedan: 0 };
+      datos.quedan += 1;
+      grupo.bloques.set(bloque, datos);
+    }
     grupos.set(clave, grupo);
   }
-  return [...grupos.values()];
+  return [...grupos.values()].map(({ bloques, ...grupo }) => (
+    { ...grupo, detalleFilas: detalleDeBloques(bloques) }));
 }
 
 // Suma las unidades de todas las filas.
@@ -240,7 +291,8 @@ function filaItem(item) {
   return crear('li', { class: 'item' },
     crear('div', { class: 'fila-datos' },
       crear('strong', { class: 'codigo' }, item.codigoInterno),
-      crear('span', {}, item.descripcion)),
+      crear('span', {}, item.descripcion),
+      notaPorFilas(item)),
     crear('button', {
       type: 'button',
       class: 'boton boton-secundario item-quitar',
@@ -257,7 +309,10 @@ function filaItem(item) {
 function pintarPantalla() {
   vistaApertura.hidden = pallet !== null;
   vistaEscaneo.hidden = pallet === null;
-  if (!pallet) return;
+  if (!pallet) {
+    cancelarEsperaDeFilas();
+    return;
+  }
 
   const items = agruparPorProducto(pallet.lecturas);
   const totalCajas = pallet.lecturas.length;
@@ -269,6 +324,9 @@ function pintarPantalla() {
   totalDeUnidades.textContent = unidades(sumarUnidades(items));
   etiquetaCajas.textContent = totalCajas === 1 ? 'caja' : 'cajas';
   listaItems.replaceChildren(...items.map(filaItem));
+  resumenPallet.hidden = totalCajas === 0;
+  resumenPallet.textContent = `Resumen: ${cajas(totalCajas)} y ${unidades(sumarUnidades(items))}`;
+  if (totalCajas === 0) botonSeguirCamara.hidden = true;
   botonCerrar.disabled = totalCajas === 0;
   botonDeshacer.disabled = totalCajas === 0;
 }
@@ -339,6 +397,10 @@ function procesarCodigo(textoLeido) {
     rechazarLectura('No se sumó', `${codigoInterno || codigo}: faltan datos en Productos.`);
     return;
   }
+  if (esperandoCajaDeFilas) {
+    abrirDialogoDeFilas(producto);
+    return;
+  }
   pallet.lecturas.push({ codigoInterno, codigoBarras, descripcion, unidadesPorCaja });
   guardarPalletAbierto();
   pintarPantalla();
@@ -358,14 +420,37 @@ function esToqueRepetido() {
   return false;
 }
 
-// Saca la última caja leída, sea del producto que sea.
-function deshacerUltimoEscaneo() {
+// Saca la última caja leída, sea del producto que sea. Si fue un conteo por filas lo saca
+// entero, después de preguntar: un número mal escrito se corrige de una sola vez.
+async function deshacerUltimoEscaneo() {
   if (esToqueRepetido()) return;
-  const lectura = pallet.lecturas.pop();
+  const lectura = pallet.lecturas.at(-1);
   if (!lectura) return;
+  if (lectura.bloque) {
+    await deshacerConteoPorFilas(lectura);
+    return;
+  }
+  pallet.lecturas.pop();
   guardarPalletAbierto();
   pintarPantalla();
   mostrarEnTablero('espera', 'Se deshizo una caja', lectura.codigoInterno);
+}
+
+// Saca todas las cajas que se sumaron juntas con Contar por filas.
+async function deshacerConteoPorFilas({ bloque, codigoInterno }) {
+  const cantidad = pallet.lecturas.filter((lectura) => lectura.bloque === bloque).length;
+  const deshacer = await confirmar({
+    titulo: '¿Deshacer el conteo por filas?',
+    detalle: `Se saca todo junto: ${cajas(cantidad)} de ${codigoInterno}.`,
+    si: 'Deshacer',
+    no: 'Dejarlo',
+    peligro: true,
+  });
+  if (!deshacer || !pallet) return;
+  pallet.lecturas = pallet.lecturas.filter((lectura) => lectura.bloque !== bloque);
+  guardarPalletAbierto();
+  pintarPantalla();
+  mostrarEnTablero('espera', 'Se deshizo el conteo por filas', `${codigoInterno}: ${cajas(cantidad)}`);
 }
 
 // Saca la última caja leída de una fila de la lista (botón -1).
@@ -383,7 +468,6 @@ function quitarUnaCaja(item) {
 function terminarPallet() {
   pallet = null;
   guardarPalletAbierto();
-  olvidarCajasVistas();
   if (camaraEncendida) apagarLaCamara();
   prepararApertura();
   pintarPantalla();
@@ -477,6 +561,89 @@ async function descartarPallet() {
   avisar('Pallet descartado');
 }
 
+// Las cajas del medio del pallet no se pueden escanear sin desarmarlo. Este botón pide una
+// lectura que no suma: solo dice de qué producto son, y después se escriben las cantidades.
+function alternarContarPorFilas() {
+  if (esperandoCajaDeFilas) {
+    cancelarEsperaDeFilas();
+    mostrarEstadoDelPallet();
+    return;
+  }
+  esperandoCajaDeFilas = true;
+  ultimaVezQueVioUnCodigo = performance.now();
+  botonFilas.textContent = 'Cancelar filas';
+  mostrarEnTablero('espera', 'Escaneá una caja del producto', 'No se suma: solo dice qué producto es.');
+}
+
+// Deja de esperar la caja que dice el producto. Si no estaba esperando, no cambia nada.
+function cancelarEsperaDeFilas() {
+  esperandoCajaDeFilas = false;
+  botonFilas.textContent = 'Contar por filas';
+}
+
+// Abre la ventana para escribir las cantidades de ese producto.
+function abrirDialogoDeFilas(producto) {
+  cancelarEsperaDeFilas();
+  productoDeFilas = producto;
+  document.getElementById('filas-producto').textContent = `${producto.codigoInterno}: ${producto.descripcion}`;
+  campoCajasPorFila.value = '';
+  campoFilas.value = '';
+  pintarCuentaDeFilas();
+  dialogoFilas.showModal();
+  campoCajasPorFila.focus();
+}
+
+// Devuelve el número escrito en ese campo, o 0 si no es un entero mayor que cero.
+const enteroDelCampo = (campo) => (/^[1-9]\d*$/.test(campo.value) ? Number(campo.value) : 0);
+
+// Muestra la cuenta mientras se escribe. El tope frena una lectura de la pistola que cayó acá.
+function pintarCuentaDeFilas() {
+  const cajasPorFila = enteroDelCampo(campoCajasPorFila);
+  const filas = enteroDelCampo(campoFilas);
+  const total = cajasPorFila * filas;
+  const valida = total > 0 && total <= MAXIMO_CAJAS_POR_FILAS;
+  botonSumarFilas.disabled = !valida;
+  botonSumarFilas.textContent = valida ? `Sumar ${cajas(total)}` : 'Sumar';
+  if (valida) {
+    const totalDeUnidadesDeFilas = unidades(total * productoDeFilas.unidadesPorCaja);
+    cuentaDeFilas.textContent = `${cajasPorFila} × ${filas} = ${cajas(total)}, ${totalDeUnidadesDeFilas}`;
+  } else if (total > MAXIMO_CAJAS_POR_FILAS) {
+    cuentaDeFilas.textContent = `Son más de ${MAXIMO_CAJAS_POR_FILAS} cajas: revisá los números.`;
+  } else {
+    cuentaDeFilas.textContent = 'Escribí los dos números.';
+  }
+}
+
+// Suma las cajas de una vez. Con la cámara abierta va al resumen, para revisar la cuenta.
+function sumarPorFilas(evento) {
+  evento.preventDefault();
+  if (botonSumarFilas.disabled || !pallet) return;
+  const cajasPorFila = enteroDelCampo(campoCajasPorFila);
+  const filas = enteroDelCampo(campoFilas);
+  const total = cajasPorFila * filas;
+  const { codigoInterno, codigoBarras, descripcion, unidadesPorCaja } = productoDeFilas;
+  // bloque identifica las cajas sumadas juntas, para poder deshacerlas de una vez.
+  const bloque = Date.now();
+  for (let i = 0; i < total; i += 1) {
+    pallet.lecturas.push({ codigoInterno, codigoBarras, descripcion, unidadesPorCaja, bloque, cajasPorFila, filas });
+  }
+  dialogoFilas.close();
+  guardarPalletAbierto();
+  pintarPantalla();
+  mostrarEnTablero('ok', `${cajas(total)} de ${codigoInterno}`, `Por filas: ${cajasPorFila} × ${filas}`);
+  senalOk();
+  if (camaraEncendida) cerrarLaCamaraYVerResumen().catch(console.error);
+}
+
+// Con la pistola, el Enter del final de una lectura no suma nada. Así, una lectura que caiga
+// en esta ventana no carga cajas: el primer campo pasa al siguiente y el último avisa.
+function noSumarConEnter(evento) {
+  if (evento.key !== 'Enter' || !evento.target.matches('input')) return;
+  evento.preventDefault();
+  if (evento.target === campoCajasPorFila) campoFilas.focus();
+  else senalError();
+}
+
 // Abre el formulario de producto con el código que no se encontró.
 function agregarCodigoDesconocido() {
   agregarProductoConCodigo(codigoDesconocido, () => {
@@ -499,40 +666,109 @@ function volverAModoPistola() {
   campoLector.blur(); // Cierra el teclado. mantenerFoco devuelve el cursor al campo.
 }
 
-// Traduce el error de la cámara a un mensaje que se entienda.
-function mensajeDeCamara(error) {
-  const detalle = String(error);
-  if (detalle.includes('NotAllowed')) return 'Falta el permiso: permití usar la cámara en el navegador.';
-  if (detalle.includes('NotFound')) return 'Este dispositivo no tiene cámara.';
-  return 'No se pudo encender la cámara. Probá recargar la página.';
+// Deja el botón Leer como al principio, sin ninguna lectura pedida.
+function terminarLectura() {
+  clearTimeout(temporizadorLeer);
+  temporizadorLeer = null;
+  botonLeer.textContent = 'Leer';
+  botonLeer.classList.replace('boton-tablero', 'boton-marcha');
+  cartelAcercarse.hidden = true;
+}
+
+// Si la cámara no encontró ningún código a tiempo, avisa: esa caja no se contó.
+function vencerLectura() {
+  terminarLectura();
+  if (!document.querySelector('dialog[open]')) {
+    rechazarLectura('No se leyó ningún código', 'Acercá más la cámara y tocá Leer de nuevo.');
+  }
+}
+
+// Todas las cajas de un producto traen el mismo código, y la cámara no sabe cuándo se pasó a la
+// siguiente. Por eso cada toque pide una sola lectura, igual que un gatillazo de la pistola.
+function pedirLectura() {
+  // Un doble toque sin querer, con el código a la vista, contaría dos cajas.
+  const ahora = performance.now();
+  if (ahora - ultimoToqueDeLeer < ESPERA_ENTRE_TOQUES_DE_LEER_MS) return;
+  ultimoToqueDeLeer = ahora;
+  ultimaVezQueVioUnCodigo = ahora;
+
+  clearTimeout(temporizadorLeer);
+  temporizadorLeer = setTimeout(vencerLectura, TIEMPO_PARA_LEER_MS);
+  botonLeer.textContent = 'Apuntá al código';
+  botonLeer.classList.replace('boton-marcha', 'boton-tablero');
+  mostrarEnTablero('espera', 'Apuntá al código de barras');
+}
+
+// La cámara llama a esta función con cada código que ve. Con Tocar para leer solo cuenta si hay
+// una lectura pedida. En modo rápido cuenta sola, y la misma caja vuelve a contar a los 2
+// segundos aunque no haya salido de la vista: es lo que avisa el cartel de ese modo.
+function alVerCodigoConLaCamara(codigo) {
+  const ahora = performance.now();
+  ultimaVezQueVioUnCodigo = ahora;
+  cartelAcercarse.hidden = true;
+  if (!visible || document.querySelector('dialog[open]')) return;
+  if (!modoRapido && temporizadorLeer === null && !esperandoCajaDeFilas) return;
+
+  const caja = buscarProducto(codigo)?.codigoInterno ?? codigo;
+  const esperando = caja === ultimaCajaContada && ahora - momentoDeLaUltimaCaja < ESPERA_EN_MODO_RAPIDO_MS;
+  if ((modoRapido || esperandoCajaDeFilas) && esperando) return;
+
+  ultimaCajaContada = caja;
+  momentoDeLaUltimaCaja = ahora;
+  terminarLectura();
+  procesarCodigo(codigo);
+}
+
+// La distancia no se puede medir: si la cámara está buscando un código y hace rato que no ve
+// ninguno, lo más probable es que esté lejos.
+function alNoVerCodigoConLaCamara() {
+  const buscandoCodigo = modoRapido || temporizadorLeer !== null || esperandoCajaDeFilas;
+  const pasoElTiempo = performance.now() - ultimaVezQueVioUnCodigo >= ESPERA_PARA_PEDIR_QUE_SE_ACERQUE_MS;
+  cartelAcercarse.hidden = !(buscandoCodigo && pasoElTiempo);
+}
+
+// Muestra el modo elegido: en modo rápido no hay botón Leer, y en su lugar va el aviso.
+function pintarModoDeCamara() {
+  botonLeer.hidden = modoRapido;
+  avisoRapido.hidden = !modoRapido;
+  botonModoTocar.setAttribute('aria-pressed', String(!modoRapido));
+  botonModoRapido.setAttribute('aria-pressed', String(modoRapido));
+}
+
+// Cambia de modo y lo deja guardado en el dispositivo. Una lectura pedida se cancela.
+function elegirModoDeCamara(rapido) {
+  modoRapido = rapido;
+  localStorage.setItem(CLAVE_MODO_CAMARA, rapido ? 'rapido' : 'tocar');
+  ultimaVezQueVioUnCodigo = performance.now();
+  terminarLectura();
+  pintarModoDeCamara();
 }
 
 // Enciende la cámara. Antes revisa que la página sea segura y que la librería haya cargado.
 async function encenderLaCamara() {
-  if (!window.isSecureContext) {
-    avisar('La cámara solo funciona si la app se abre desde https o localhost. Ver README.md.', 'error');
-    return;
-  }
-  if (typeof Html5Qrcode === 'undefined') {
-    avisar('No se pudo cargar el lector de la cámara. Revisá la conexión y recargá la página.', 'error');
+  const motivo = motivoSinCamara();
+  if (motivo) {
+    avisar(motivo, 'error');
     return;
   }
   botonCamara.disabled = true;
+  botonCamara.textContent = 'Cerrar cámara';
+  botonSeguirCamara.hidden = true;
   marcoCamara.hidden = false;
+  // Va antes de encenderla: html5-qrcode toma en ese momento el ancho que va a tener el video.
+  document.body.classList.add('con-camara');
   try {
-    await encenderCamara('camara', (codigo) => {
-      if (!visible || document.querySelector('dialog[open]')) return false;
-      procesarCodigo(codigo);
-      return true;
-    }, (codigo) => buscarProducto(codigo)?.codigoInterno ?? codigo);
+    ultimaVezQueVioUnCodigo = performance.now();
+    await encenderCamara('camara', alVerCodigoConLaCamara, alNoVerCodigoConLaCamara);
     camaraEncendida = true;
     anchoDeLaCamara = document.documentElement.clientWidth;
-    botonCamara.textContent = 'Apagar cámara';
-    // El botón está más abajo: sin esto, el contador queda fuera de la pantalla mientras se apunta.
+    // En la PC el botón está más abajo: sin esto, el contador podría quedar fuera de la pantalla.
     tablero.scrollIntoView({ block: 'start' });
   } catch (error) {
     console.error(error);
+    botonCamara.textContent = 'Usar cámara';
     marcoCamara.hidden = true;
+    document.body.classList.remove('con-camara');
     avisar(mensajeDeCamara(error), 'error');
   }
   botonCamara.disabled = false;
@@ -543,9 +779,36 @@ async function encenderLaCamara() {
 // Apaga la cámara y deja el botón y el recuadro como al principio.
 async function apagarLaCamara() {
   camaraEncendida = false;
+  if ((temporizadorLeer !== null || esperandoCajaDeFilas) && pallet) mostrarEstadoDelPallet();
+  terminarLectura();
+  cancelarEsperaDeFilas();
   botonCamara.textContent = 'Usar cámara';
   marcoCamara.hidden = true;
+  document.body.classList.remove('con-camara');
   await apagarCamara();
+}
+
+// Con la cámara abierta solo se ve la última lectura. Al cerrarla a mano la pantalla va al
+// resumen, para revisar lo contado y corregirlo con -1 antes de cerrar el pallet.
+async function cerrarLaCamaraYVerResumen() {
+  const cierre = apagarLaCamara();
+  if (pallet?.lecturas.length) {
+    botonSeguirCamara.hidden = false;
+    resumenPallet.scrollIntoView({ block: 'start' });
+  }
+  await cierre;
+}
+
+// En la app de Android, la tecla Atrás cierra primero lo que esté abierto. Sin esto saldría
+// de la app, aunque se estuviera mirando una pregunta o la pantalla de la cámara.
+function escucharTeclaAtras() {
+  const app = window.Capacitor?.Plugins?.App;
+  app?.addListener('backButton', () => {
+    const dialogo = document.querySelector('dialog[open]');
+    if (dialogo) dialogo.close();
+    else if (camaraEncendida) cerrarLaCamaraYVerResumen().catch(console.error);
+    else app.exitApp();
+  });
 }
 
 // html5-qrcode fija el ancho del video al encender. Si se gira el celular hay que reiniciarla:
@@ -564,10 +827,10 @@ function alCambiarEnOtraPestana(evento) {
   pallet = JSON.parse(evento.newValue ?? 'null');
   // Una pregunta abierta se armó con el pallet de antes: contestarla ahora actuaría sobre otro.
   document.getElementById('dialogo-confirmar').close();
+  dialogoFilas.close();
   if (pallet) {
     escucharPalletsDe(pallet.fecha);
   } else {
-    olvidarCajasVistas();
     if (camaraEncendida) apagarLaCamara();
     prepararApertura();
   }
@@ -582,7 +845,6 @@ export function iniciarPantallaEscaneo() {
   else prepararApertura();
   pintarPantalla();
   if (pallet) mostrarEstadoDelPallet();
-  if (pallet?.lecturas.length) recordarCajaVista(pallet.lecturas.at(-1).codigoInterno);
   devolverPalletRechazado();
   enfocarLector();
 
@@ -614,13 +876,28 @@ export function iniciarPantallaEscaneo() {
   });
 
   botonDeshacer.addEventListener('click', deshacerUltimoEscaneo);
-  botonCamara.addEventListener('click', () => (camaraEncendida ? apagarLaCamara() : encenderLaCamara()));
+  botonFilas.addEventListener('click', alternarContarPorFilas);
+  formularioFilas.addEventListener('submit', sumarPorFilas);
+  formularioFilas.addEventListener('input', pintarCuentaDeFilas);
+  formularioFilas.addEventListener('keydown', noSumarConEnter);
+  document.getElementById('btn-cancelar-filas').addEventListener('click', () => dialogoFilas.close());
+  // En modo rápido, la caja que dijo el producto no tiene que contarse sola al cerrar la ventana.
+  dialogoFilas.addEventListener('close', () => {
+    momentoDeLaUltimaCaja = performance.now();
+  });
+  botonCamara.addEventListener('click', () => (camaraEncendida ? cerrarLaCamaraYVerResumen() : encenderLaCamara()));
+  botonSeguirCamara.addEventListener('click', encenderLaCamara);
+  botonLeer.addEventListener('click', pedirLectura);
+  botonModoTocar.addEventListener('click', () => elegirModoDeCamara(false));
+  botonModoRapido.addEventListener('click', () => elegirModoDeCamara(true));
+  pintarModoDeCamara();
   botonAgregarCodigo.addEventListener('click', agregarCodigoDesconocido);
   botonCerrar.addEventListener('click', cerrarPallet);
   document.getElementById('btn-descartar').addEventListener('click', descartarPallet);
   document.getElementById('btn-escribir').addEventListener('click', escribirAMano);
   window.addEventListener('resize', () => reiniciarCamaraSiCambioElAncho().catch(console.error));
   window.addEventListener('storage', alCambiarEnOtraPestana);
+  escucharTeclaAtras();
 }
 
 // Se llama al entrar a esta pantalla.

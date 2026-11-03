@@ -69,8 +69,17 @@
 
           <!-- Pegado al tablero: al apuntar con la cámara hay que ver el video y el color juntos -->
           <div id="marco-camara" class="marco-camara" hidden>
-            <div class="visor-camara"><div id="camara"></div></div>
-            <p class="ayuda-camara">Apuntá al código de una caja. Cada caja contada hace un pitido. Para contar otra, sacá el código de la vista 2 segundos y volvé a apuntar.</p>
+            <div class="modo-camara" role="group" aria-label="Modo de lectura">
+              <button id="btn-modo-tocar" type="button" aria-pressed="true">Tocar para leer</button>
+              <button id="btn-modo-rapido" type="button" aria-pressed="false">Modo rápido</button>
+            </div>
+            <div class="visor-camara">
+              <div id="camara"></div>
+              <p id="cartel-acercarse" class="cartel-acercarse" hidden>Acercá más la cámara</p>
+            </div>
+            <button id="btn-leer" type="button" class="boton boton-marcha boton-leer">Leer</button>
+            <p id="aviso-rapido" class="aviso-rapido" hidden>Cuenta sola. Si te quedás más de 2 segundos en la misma caja, la cuenta otra vez.</p>
+            <p class="ayuda-camara">Acercá la cámara hasta que la franja se ponga verde. Cada caja contada hace un pitido.</p>
           </div>
 
           <!-- Este campo siempre tiene el foco: la pistola escribe acá y presiona Enter -->
@@ -85,17 +94,21 @@
             </div>
           </form>
 
-          <button id="btn-deshacer" type="button" class="boton boton-secundario" disabled>Deshacer último escaneo</button>
+          <button id="btn-deshacer" type="button" class="boton boton-secundario" disabled>Deshacer<span class="fuera-de-camara"> último escaneo</span></button>
 
           <div class="dos-botones">
             <button id="btn-camara" type="button" class="boton boton-secundario">Usar cámara</button>
             <button id="btn-escribir" type="button" class="boton boton-secundario solo-tactil">Escribir a mano</button>
           </div>
+
+          <button id="btn-filas" type="button" class="boton boton-secundario">Contar por filas</button>
         </div>
 
         <div class="columna">
+          <p id="resumen-pallet" class="resumen" hidden></p>
           <ul id="lista-items" class="lista items"></ul>
           <div class="acciones">
+            <button id="btn-seguir-camara" type="button" class="boton boton-tablero" hidden>Seguir con la cámara</button>
             <button id="btn-cerrar" type="button" class="boton boton-marcha" disabled>Cerrar pallet</button>
             <button id="btn-descartar" type="button" class="boton boton-secundario">Descartar pallet</button>
           </div>
@@ -117,7 +130,8 @@
     <!-- Pantalla 3: tabla de productos -->
     <section id="pantalla-productos" class="pantalla" hidden>
       <h1>Productos</h1>
-      <button id="btn-nuevo-producto" type="button" class="boton boton-tablero">Agregar producto</button>
+      <button id="btn-escanear-producto" type="button" class="boton boton-tablero">Escanear producto nuevo</button>
+      <button id="btn-nuevo-producto" type="button" class="boton boton-secundario">Agregar producto</button>
       <button id="btn-cargar-prueba" type="button" class="boton boton-secundario" hidden>Cargar productos de prueba</button>
       <label class="campo" for="buscar-producto">Buscar
         <input id="buscar-producto" type="search" autocomplete="off" placeholder="Código o descripción">
@@ -147,6 +161,27 @@
     </form>
   </dialog>
 
+  <!-- Ventana para sumar de una vez las cajas que no se pueden escanear -->
+  <dialog id="dialogo-filas" class="dialogo">
+    <form id="form-filas">
+      <h2>Contar por filas</h2>
+      <p id="filas-producto"></p>
+      <div class="dos-botones">
+        <label class="campo" for="filas-cajas">Cajas por fila
+          <input id="filas-cajas" type="number" min="1" step="1" inputmode="numeric" autocomplete="off" required>
+        </label>
+        <label class="campo" for="filas-cantidad">Filas
+          <input id="filas-cantidad" type="number" min="1" step="1" inputmode="numeric" autocomplete="off" required>
+        </label>
+      </div>
+      <p id="filas-cuenta" class="resumen"></p>
+      <div class="dos-botones">
+        <button id="btn-cancelar-filas" type="button" class="boton boton-secundario">Cancelar</button>
+        <button id="btn-sumar-filas" type="submit" class="boton boton-marcha" disabled>Sumar</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- Ventana para agregar o editar un producto -->
   <dialog id="dialogo-producto" class="dialogo">
     <form id="form-producto">
@@ -154,6 +189,13 @@
       <label class="campo" for="campo-barras">Código de barras (si tiene)
         <input id="campo-barras" autocomplete="off" spellcheck="false">
       </label>
+      <button id="btn-leer-barras" type="button" class="boton boton-secundario">Leer con la cámara</button>
+      <div id="marco-leer-barras" class="marco-camara" hidden>
+        <div class="visor-camara">
+          <div id="camara-producto"></div>
+        </div>
+        <p class="ayuda-camara">Acercá la cámara al código de barras hasta que suene el pitido.</p>
+      </div>
       <label class="campo" for="campo-interno">Código interno
         <input id="campo-interno" required autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KD0324">
       </label>

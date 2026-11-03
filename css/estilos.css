@@ -382,7 +382,6 @@ h2 {
 }
 
 .marco-camara {
-  overflow: hidden;
   border-radius: 10px;
   background: var(--tablero);
   color: #fff;
@@ -393,13 +392,308 @@ h2 {
 .visor-camara {
   display: flex;
   align-items: center;
+  position: relative;
   max-height: 70vw;
   overflow: hidden;
 }
 
-#camara {
+/* Elegir cómo cuenta la cámara: mismo aspecto que la barra de abajo. */
+.modo-camara {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.modo-camara button {
+  min-height: 60px;
+  border: 0;
+  border-bottom: 6px solid transparent;
+  background: none;
+  color: #fff;
+  font-family: var(--letra-angosta);
+  font-size: 24px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modo-camara [aria-pressed='true'] {
+  border-bottom-color: var(--led);
+  color: var(--led);
+  font-weight: 700;
+}
+
+/* Va sobre el video, arriba de todo: el centro lo puede tapar el botón Leer. */
+.cartel-acercarse {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  left: 12px;
+  z-index: 1;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--led);
+  color: var(--tinta);
+  font-family: var(--letra-angosta);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  pointer-events: none;
+}
+
+.aviso-rapido {
+  margin: 12px 12px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--led);
+  color: var(--tinta);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+#camara,
+#camara-producto {
   flex: none;
   width: 100%;
+}
+
+/* Cámara del formulario de producto. El alto va fijo para que se vea entera desde que aparece,
+   y no pasa de media pantalla para que entre con el celular acostado. */
+#btn-leer-barras {
+  margin-bottom: 14px;
+}
+
+#marco-leer-barras {
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.dialogo .visor-camara {
+  height: min(70vw, 50vh);
+}
+
+.dialogo .ayuda-camara {
+  margin: 0;
+  font-size: 20px;
+}
+
+.boton-leer {
+  width: calc(100% - 24px);
+  margin: 12px 12px 0;
+}
+
+#resumen-pallet {
+  margin-block: 0;
+  scroll-margin-top: 12px;
+}
+
+.nota-por-filas {
+  display: block;
+  color: var(--tinta-suave);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+#filas-producto {
+  margin-block: 0;
+}
+
+#filas-cuenta {
+  min-height: 2.3em;
+  margin-block: 0 14px;
+  font-size: 26px;
+}
+
+/* En el celular, la cámara abierta es como otra pantalla: ocupa todo, sin la barra de abajo, y
+   nada queda fuera de la vista. El campo de la pistola no se ve, pero sigue activo. */
+@media (max-width: 899px), (max-height: 500px) {
+  .con-camara {
+    overflow: hidden;
+  }
+
+  .con-camara .navegacion,
+  .con-camara #btn-escribir {
+    display: none;
+  }
+
+  .con-camara .escaneo > .columna:first-child {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 8px;
+    background: var(--tablero);
+  }
+
+  .con-camara .tablero,
+  .con-camara .marco-camara {
+    grid-column: 1 / -1;
+  }
+
+  .con-camara .form-lector {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    padding: 0;
+    opacity: 0;
+  }
+
+  .con-camara #btn-deshacer,
+  .con-camara #btn-filas,
+  .con-camara #btn-camara {
+    min-height: 64px;
+    padding-inline: 6px;
+    font-size: 21px;
+  }
+
+  .con-camara #btn-deshacer {
+    grid-row: 3;
+    grid-column: 1;
+  }
+
+  .con-camara #btn-filas {
+    grid-row: 3;
+    grid-column: 2;
+  }
+
+  .con-camara .dos-botones {
+    grid-row: 3;
+    grid-column: 3;
+  }
+
+  .con-camara .fuera-de-camara {
+    display: none;
+  }
+
+  /* El tablero se achica para dejarle lugar al video: totales a la izquierda, contador a la derecha. */
+  .con-camara .tablero {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 12px;
+    align-items: center;
+    padding: 8px 14px 10px;
+  }
+
+  .con-camara .tablero-cabecera,
+  .con-camara .lectura,
+  .con-camara #btn-agregar-codigo {
+    grid-column: 1 / -1;
+  }
+
+  .con-camara .tablero-titulo {
+    font-size: 26px;
+  }
+
+  .con-camara .contador {
+    grid-row: 2;
+    grid-column: 2;
+    margin: 0;
+    font-size: 18cqw;
+  }
+
+  .con-camara .tablero-totales {
+    grid-row: 2;
+    grid-column: 1;
+    flex-direction: column;
+    gap: 0;
+    align-items: flex-start;
+    margin: 0;
+    font-size: 24px;
+  }
+
+  .con-camara .lectura-titulo {
+    font-size: 26px;
+  }
+
+  .con-camara .lectura-detalle {
+    overflow: hidden;
+    font-size: 18px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .con-camara #btn-agregar-codigo {
+    min-height: 56px;
+    margin-top: 6px;
+  }
+
+  .con-camara .marco-camara {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .con-camara .visor-camara {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .con-camara .boton-leer,
+  .con-camara .aviso-rapido {
+    flex: none;
+    margin: 8px 8px 0;
+  }
+
+  .con-camara .boton-leer {
+    width: calc(100% - 16px);
+  }
+
+  .con-camara .aviso-rapido {
+    font-size: 18px;
+  }
+
+  .con-camara .ayuda-camara {
+    display: none;
+  }
+}
+
+@media (min-height: 760px) and (max-width: 899px) {
+  .con-camara .ayuda-camara {
+    display: block;
+    padding: 8px 12px 0;
+    font-size: 18px;
+    line-height: 1.25;
+  }
+}
+
+/* Celular apaisado: el video a la izquierda y el resto a la derecha. */
+@media (max-height: 500px) {
+  .con-camara .escaneo > .columna:first-child {
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 3fr) repeat(2, minmax(0, 1fr));
+  }
+
+  .con-camara .marco-camara {
+    grid-row: 1 / -1;
+    grid-column: 1;
+  }
+
+  .con-camara .tablero {
+    grid-row: 1;
+    grid-column: 2 / -1;
+    overflow: hidden;
+  }
+
+  .con-camara #btn-deshacer {
+    grid-row: 2;
+    grid-column: 2;
+  }
+
+  .con-camara #btn-filas {
+    grid-row: 2;
+    grid-column: 3;
+  }
+
+  .con-camara .dos-botones {
+    grid-row: 3;
+    grid-column: 2 / -1;
+  }
 }
 
 .ayuda-camara {

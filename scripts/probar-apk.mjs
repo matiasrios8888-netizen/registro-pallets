@@ -80,7 +80,7 @@ const entorno = await pagina.evaluate(() => ({
 console.log(entorno);
 comprobar('la página es segura', entorno.segura === true, entorno.url);
 comprobar('corre como app nativa', entorno.nativa === true);
-comprobar('están los plugins', entorno.plugins.includes('Filesystem') && entorno.plugins.includes('Share'), entorno.plugins.join(','));
+comprobar('están los plugins', ['App', 'Filesystem', 'Share'].every((p) => entorno.plugins.includes(p)), entorno.plugins.join(','));
 comprobar('están las librerías', entorno.camara === 'function' && entorno.excel === 'object');
 comprobar('número sugerido 1', entorno.numero === '1');
 await captura('1-abrir');
@@ -145,19 +145,21 @@ const camara = await pagina.evaluate(() => {
     vivas: video?.srcObject?.getVideoTracks().filter((t) => t.readyState === 'live').length,
   };
 });
-comprobar('la cámara enciende', camara.boton === 'Apagar cámara' && camara.vivas === 1 && camara.ancho > 0, JSON.stringify(camara));
+comprobar('la cámara enciende', camara.boton === 'Cerrar cámara' && camara.vivas === 1 && camara.ancho > 0, JSON.stringify(camara));
 const alLeer = await pagina.evaluate(() => {
   const borde = (selector) => {
     const r = document.querySelector(selector).getBoundingClientRect();
     return [Math.round(r.top), Math.round(r.bottom)];
   };
-  return { tablero: borde('#tablero'), visor: borde('.visor-camara'), barra: borde('.navegacion'), alto: innerHeight };
+  return { tablero: borde('#tablero'), visor: borde('.visor-camara'), cerrar: borde('#btn-camara'), alto: innerHeight };
 });
 console.log('camara encendida', JSON.stringify(alLeer));
-comprobar('se ven juntos el contador y el visor', alLeer.tablero[0] >= -60 && alLeer.visor[1] <= alLeer.barra[0] + 20, JSON.stringify(alLeer));
+comprobar('se ven juntos el contador, el visor y Cerrar cámara', alLeer.tablero[0] >= 0 && alLeer.visor[1] <= alLeer.cerrar[0] && alLeer.cerrar[1] <= alLeer.alto, JSON.stringify(alLeer));
 await captura('4-camara');
-await pagina.locator('#btn-camara').click();
+await consola('input keyevent 4');
 await esperar(1000);
+const botonAlCerrar = await pagina.locator('#btn-camara').textContent();
+comprobar('la tecla Atrás cierra la cámara sin salir de la app', botonAlCerrar === 'Usar cámara', botonAlCerrar);
 
 await pagina.getByRole('button', { name: 'Cerrar pallet' }).click();
 await esperar(800);

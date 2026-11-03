@@ -1,6 +1,7 @@
 // La tabla de productos: cómo se busca un producto por su código y la pantalla "Productos".
 import { borrarProducto, escucharProductos, guardarProducto } from './datos.js';
 import { productosDePrueba } from './datos-prueba.js';
+import { apagarCamara, encenderCamara, mensajeDeCamara, motivoSinCamara } from './lector.js';
 import {
   avisar,
   avisarErrorDeDatos,
@@ -8,6 +9,7 @@ import {
   crear,
   motivoDelError,
   senalError,
+  senalOk,
   unidades,
 } from './ui.js';
 
@@ -18,6 +20,10 @@ let cargados = false;
 let errorDeCarga = null;
 let productoEnEdicion = null;
 let alGuardarFormulario = null;
+
+// La cámara del formulario está prendida, o arrancando, mientras esto valga true.
+let leyendo = false;
+let anchoDeLaLectura = 0;
 
 const lista = document.getElementById('lista-productos');
 const buscador = document.getElementById('buscar-producto');
@@ -30,6 +36,8 @@ const campoDescripcion = document.getElementById('campo-descripcion');
 const campoUnidades = document.getElementById('campo-unidades');
 const camposEnOrden = [campoBarras, campoInterno, campoDescripcion, campoUnidades];
 const mensajeFormulario = document.getElementById('mensaje-formulario');
+const botonLeerBarras = document.getElementById('btn-leer-barras');
+const marcoLeerBarras = document.getElementById('marco-leer-barras');
 
 // Dice si ya llegó la tabla de productos. Antes de eso no se puede buscar.
 export const productosCargados = () => cargados;
@@ -97,8 +105,14 @@ function abrirFormulario(producto) {
   campoDescripcion.value = producto.descripcion ?? '';
   campoUnidades.value = producto.unidadesPorCaja ?? '';
   mensajeFormulario.hidden = true;
+  // Desde Escanear el código ya vino leído, y la cámara de esa pantalla puede seguir prendida.
+  botonLeerBarras.hidden = Boolean(alGuardarFormulario);
   dialogo.showModal();
-  // Deja el cursor en el primer campo que falta completar.
+  enfocarCampoQueFalta();
+}
+
+// Deja el cursor en el primer campo que falta completar.
+function enfocarCampoQueFalta() {
   camposEnOrden.find((campo) => !campo.value)?.focus();
 }
 
@@ -115,6 +129,80 @@ export function agregarProductoConCodigo(codigo, alGuardar) {
 function mostrarErrorDeFormulario(mensaje) {
   mensajeFormulario.textContent = mensaje;
   mensajeFormulario.hidden = false;
+}
+
+// Dos productos con el mismo código harían que la búsqueda elija cualquiera de los dos.
+const avisoDeRepetido = (producto) => (
+  `Ese código ya lo usa ${producto.codigoInterno}: ${producto.descripcion}.`);
+
+// Apaga la cámara del formulario y deja el botón como al principio.
+function apagarLectura() {
+  leyendo = false;
+  botonLeerBarras.textContent = 'Leer con la cámara';
+  marcoLeerBarras.hidden = true;
+  return apagarCamara().catch(console.error);
+}
+
+// La cámara ve el código varias veces por segundo. Al apagarla, la primera vez es la única que
+// llega acá. El código de barras solo trae el número: lo demás se escribe mirando la etiqueta.
+function alLeerCodigoDeBarras(codigo) {
+  apagarLectura();
+  campoBarras.value = normalizarCodigo(codigo);
+  const repetido = productoQueYaUsa(campoBarras.value, productoEnEdicion?.id);
+  if (repetido) {
+    senalError();
+    mostrarErrorDeFormulario(avisoDeRepetido(repetido));
+    return;
+  }
+  senalOk();
+  enfocarCampoQueFalta();
+}
+
+// Prende la cámara adentro del formulario. Si no puede, se sigue cargando a mano.
+async function encenderLectura() {
+  // Todavía está arrancando la anterior.
+  if (botonLeerBarras.disabled) return;
+  const motivo = motivoSinCamara();
+  if (motivo) {
+    mostrarErrorDeFormulario(motivo);
+    return;
+  }
+  mensajeFormulario.hidden = true;
+  leyendo = true;
+  botonLeerBarras.disabled = true;
+  botonLeerBarras.textContent = 'Cerrar cámara';
+  marcoLeerBarras.hidden = false;
+  // Saca el cursor del campo: el teclado del celular taparía el video.
+  campoBarras.blur();
+  marcoLeerBarras.scrollIntoView({ block: 'nearest' });
+  try {
+    await encenderCamara('camara-producto', alLeerCodigoDeBarras, () => {});
+    anchoDeLaLectura = document.documentElement.clientWidth;
+  } catch (error) {
+    console.error(error);
+    apagarLectura();
+    mostrarErrorDeFormulario(mensajeDeCamara(error));
+    enfocarCampoQueFalta();
+  }
+  botonLeerBarras.disabled = false;
+  // Si mientras arrancaba se cerró el formulario, nadie más la apaga.
+  if (!leyendo) apagarCamara().catch(console.error);
+}
+
+// html5-qrcode fija el ancho del video al encender. Si se gira el celular hay que reiniciarla:
+// si no, el video queda del ancho viejo y el recuadro de lectura queda corrido.
+async function reiniciarLecturaSiCambioElAncho() {
+  if (!leyendo || botonLeerBarras.disabled) return;
+  if (document.documentElement.clientWidth === anchoDeLaLectura) return;
+  await apagarLectura();
+  await encenderLectura();
+}
+
+// Abre el formulario vacío con la cámara prendida, para no tener que escribir el código.
+function escanearProductoNuevo() {
+  alGuardarFormulario = null;
+  abrirFormulario({});
+  encenderLectura();
 }
 
 // Valida el formulario y guarda el producto.
@@ -134,10 +222,9 @@ function guardarFormulario(evento) {
     return;
   }
 
-  // Dos productos con el mismo código harían que la búsqueda elija cualquiera de los dos.
   const repetido = productoQueYaUsa(datos.codigoInterno, id) ?? productoQueYaUsa(datos.codigoBarras, id);
   if (repetido) {
-    mostrarErrorDeFormulario(`Ese código ya lo usa ${repetido.codigoInterno}: ${repetido.descripcion}.`);
+    mostrarErrorDeFormulario(avisoDeRepetido(repetido));
     return;
   }
 
@@ -241,7 +328,15 @@ export function iniciarProductos() {
     alGuardarFormulario = null;
     abrirFormulario({});
   });
+  document.getElementById('btn-escanear-producto').addEventListener('click', escanearProductoNuevo);
+  botonLeerBarras.addEventListener('click', () => (leyendo ? apagarLectura() : encenderLectura()));
   document.getElementById('btn-cancelar-producto').addEventListener('click', () => dialogo.close());
   formulario.addEventListener('submit', guardarFormulario);
   formulario.addEventListener('keydown', pasarAlCampoSiguiente);
+  // Sale por cualquier lado (Guardar, Cancelar, tecla Atrás): la cámara no puede quedar prendida.
+  // Sin leyendo apagaría la de la pantalla Escanear, que sigue abierta atrás del formulario.
+  dialogo.addEventListener('close', () => {
+    if (leyendo) apagarLectura();
+  });
+  window.addEventListener('resize', reiniciarLecturaSiCambioElAncho);
 }

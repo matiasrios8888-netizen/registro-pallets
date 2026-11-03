@@ -26,6 +26,12 @@ jobs:
           npm ci
           npm install --no-save playwright-core
 
+      # La prueba no puede tocar la base real: se arma un APK en modo prueba, con config.js vacío.
+      - name: Pasar a modo prueba
+        run: |
+          sed -i -E "s/^(  [A-Za-z]+): '[^']*',/\1: '',/" js/config.js
+          grep -q "projectId: ''," js/config.js
+
       - name: Compilar el APK
         run: |
           npm run sincronizar

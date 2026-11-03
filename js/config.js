@@ -8,10 +8,10 @@
 // que protege la base son las reglas de firestore.rules. Es distinto de la API key de
 // Claude, que esa sí nunca va acá.
 export const firebaseConfig = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: '',
+  apiKey: 'AIzaSyAq8hlHhDB1e1vixbtsbre3K6dKw19_6Rw',
+  authDomain: 'registro-de-palets.firebaseapp.com',
+  projectId: 'registro-de-palets',
+  storageBucket: 'registro-de-palets.firebasestorage.app',
+  messagingSenderId: '578750266079',
+  appId: '1:578750266079:web:378ed2252f02e642b1076a',
 };

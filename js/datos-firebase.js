@@ -16,6 +16,14 @@ import {
   setDoc,
   deleteDoc,
 } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
+import {
+  initializeAuth,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { firebaseConfig } from './config.js';
 
 const app = initializeApp(firebaseConfig);
@@ -24,6 +32,11 @@ const app = initializeApp(firebaseConfig);
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 });
+
+// La sesión queda guardada en el dispositivo: se entra una sola vez. initializeAuth en vez de
+// getAuth porque getAuth carga una ventana de Google para entrar con cuenta de Google, que no se
+// usa y en la app de Android no anda.
+const auth = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] });
 
 // Convierte un resultado de Firestore en una lista común, con el id de cada documento.
 const aLista = (resultado) => resultado.docs.map((d) => ({ ...d.data(), id: d.id }));
@@ -53,12 +66,40 @@ export function escucharPallets(fecha, alCambiar, alFallar) {
 
 // async: si un dato es inválido, setDoc falla en el momento y no con la promesa. Así ese
 // error también llega al .catch de quien guarda.
-// Crea un documento nuevo con el pallet cerrado.
+// Crea un documento nuevo con el pallet cerrado. creadoPor dice qué usuario lo cerró: las
+// reglas de la base no aceptan un pallet a nombre de otro.
 export async function guardarPallet(pallet) {
-  return setDoc(doc(collection(db, 'pallets')), pallet);
+  return setDoc(doc(collection(db, 'pallets')), { ...pallet, creadoPor: auth.currentUser.uid });
 }
 
 // Borra un pallet cerrado. No se puede recuperar.
 export function borrarPallet(id) {
   return deleteDoc(doc(db, 'pallets', id));
+}
+
+// Inicio de sesión: estas funciones existen solo acá, en modo prueba no hay usuarios.
+
+// Llama a alCambiar ahora y cada vez que alguien entra o sale: con { uid } o con null.
+export function escucharSesion(alCambiar) {
+  return onAuthStateChanged(auth, (cuenta) => alCambiar(cuenta && { uid: cuenta.uid }));
+}
+
+// Entra con correo y contraseña. Falla si están mal o si no hay internet.
+export function entrar(correo, contrasena) {
+  return signInWithEmailAndPassword(auth, correo, contrasena);
+}
+
+export function salir() {
+  return signOut(auth);
+}
+
+// Llama a alCambiar con los datos del usuario ({ nombre, rol }), o con {} si todavía no
+// guardó su nombre.
+export function escucharUsuario(uid, alCambiar, alFallar) {
+  return onSnapshot(doc(db, 'usuarios', uid), (d) => alCambiar(d.data() ?? {}), alFallar);
+}
+
+// merge: true cambia solo el nombre y deja el rol como está.
+export function guardarNombre(uid, nombre) {
+  return setDoc(doc(db, 'usuarios', uid), { nombre }, { merge: true });
 }

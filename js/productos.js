@@ -1,7 +1,8 @@
 // La tabla de productos: cómo se busca un producto por su código y la pantalla "Productos".
-import { borrarProducto, escucharProductos, guardarProducto } from './datos.js';
+import { borrarProducto, escucharProductos, guardarProducto, modoPrueba } from './datos.js';
 import { productosDePrueba } from './datos-prueba.js';
 import { apagarCamara, encenderCamara, mensajeDeCamara, motivoSinCamara } from './lector.js';
+import { esSupervisor } from './sesion.js';
 import {
   avisar,
   avisarErrorDeDatos,
@@ -245,7 +246,7 @@ async function eliminar(producto) {
   if (borrar) borrarProducto(producto.id).catch(avisarErrorDeDatos);
 }
 
-// Arma la fila de un producto con sus botones Editar y Borrar.
+// Arma la fila de un producto. Los botones Editar y Borrar son solo para el supervisor.
 function filaProducto(producto) {
   return crear('li', { class: 'fila-producto' },
     crear('div', { class: 'fila-datos' },
@@ -254,7 +255,7 @@ function filaProducto(producto) {
       crear('span', {}, `${unidades(producto.unidadesPorCaja)} por caja`),
       crear('span', { class: 'dato-suave' },
         producto.codigoBarras ? `Código de barras ${producto.codigoBarras}` : 'Sin código de barras')),
-    crear('div', { class: 'fila-botones' },
+    esSupervisor() ? crear('div', { class: 'fila-botones' },
       crear('button', {
         type: 'button',
         class: 'boton boton-secundario',
@@ -267,7 +268,7 @@ function filaProducto(producto) {
         type: 'button',
         class: 'boton boton-secundario',
         alHacerClic: () => eliminar(producto),
-      }, 'Borrar')));
+      }, 'Borrar')) : '');
 }
 
 // Dibuja la lista ordenada por código interno, aplicando el texto de Buscar.
@@ -282,7 +283,8 @@ function pintarLista() {
     const mensaje = filtro ? 'Ningún producto coincide con esa búsqueda.' : 'Todavía no hay productos.';
     lista.append(crear('li', { class: 'vacio' }, mensaje));
   }
-  botonCargarPrueba.hidden = productos.length > 0;
+  // Con Firebase la base es la de verdad: ahí no van productos inventados.
+  botonCargarPrueba.hidden = !modoPrueba || productos.length > 0;
 }
 
 // Guarda los 4 productos de prueba en la base.
@@ -311,6 +313,10 @@ function alFallarLaCarga(error) {
 
 // Empieza a seguir la tabla y conecta los botones. Se llama una sola vez, al arrancar la app.
 export function iniciarProductos() {
+  // Solo el supervisor carga y cambia productos: los demás ven la lista, nada más.
+  document.getElementById('btn-escanear-producto').hidden = !esSupervisor();
+  document.getElementById('btn-nuevo-producto').hidden = !esSupervisor();
+
   escucharProductos((listaNueva) => {
     productos = listaNueva.map(productoCompleto);
     cargados = true;

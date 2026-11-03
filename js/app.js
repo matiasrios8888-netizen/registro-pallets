@@ -3,6 +3,7 @@ import { modoPrueba } from './datos.js';
 import { alMostrarEscaneo, alOcultarEscaneo, iniciarPantallaEscaneo } from './pantalla-escaneo.js';
 import { alMostrarHistorial, iniciarPantallaHistorial } from './pantalla-historial.js';
 import { iniciarProductos } from './productos.js';
+import { iniciarSesion } from './sesion.js';
 
 const botonesNavegacion = document.querySelectorAll('[data-pantalla]');
 
@@ -28,6 +29,9 @@ botonesNavegacion.forEach((boton) => {
 
 document.getElementById('banner-modo-prueba').hidden = !modoPrueba;
 
+// Con Firebase, las pantallas arrancan recién cuando alguien entró: sin sesión, la base no deja
+// leer nada.
+await iniciarSesion();
 iniciarProductos();
 iniciarPantallaEscaneo();
 iniciarPantallaHistorial();

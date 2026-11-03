@@ -41,24 +41,29 @@
   font-display: swap;
 }
 
-/* Colores en un solo lugar. Los botones siguen los colores de los pulsadores industriales:
-   verde para marcha, rojo para paro. */
+/* Colores en un solo lugar. Celeste y naranja son los de la empresa: el azul oscuro sale del
+   celeste, y el naranja va en los botones principales. El verde y el rojo quedan solo para
+   "leyó bien" y "error", como los pulsadores industriales de marcha y paro: no se mezclan con
+   los de la empresa. */
 :root {
-  --gabinete: #d2d5d0;
-  --chapa: #f3f4f1;
-  --tablero: #15262f;
-  --tablero-linea: #2d424d;
-  --tinta: #15262f;
-  --tinta-suave: #47565e;
-  --led: #ffb000;
-  --led-apagado: #22353f;
+  --marca-celeste: #08a0e3;
+  --marca-naranja: #ec7004;
+  --marca-naranja-borde: #9a4800;
+  --gabinete: #d5e2e9;
+  --chapa: #f4f8fa;
+  --tablero: #073b57;
+  --tinta: #0b2b3d;
+  --tinta-suave: #3f5a69;
+  /* Más claro que el naranja de la empresa: sobre el azul se lee mejor de lejos. */
+  --led: #ff8a1f;
+  --led-apagado: #0c4766;
   --marcha: #0b7a3b;
   --marcha-borde: #075527;
   --paro: #c4122f;
   --paro-borde: #8a0c20;
   --aviso: #f6c700;
-  --neutro: #e7e9e5;
-  --neutro-borde: #a4aaa5;
+  --neutro: #e8f5fc;
+  --neutro-borde: var(--marca-celeste);
 
   --letra: 'Barlow', system-ui, sans-serif;
   --letra-angosta: 'Barlow Condensed', 'Arial Narrow', sans-serif;
@@ -178,10 +183,11 @@ h2 {
   --texto-boton: #fff;
 }
 
-.boton-tablero {
-  --fondo-boton: var(--tablero);
-  --borde-boton: #000;
-  --texto-boton: #fff;
+/* Texto oscuro: el blanco sobre este naranja casi no se lee. */
+.boton-naranja {
+  --fondo-boton: var(--marca-naranja);
+  --borde-boton: var(--marca-naranja-borde);
+  --texto-boton: var(--tinta);
 }
 
 .boton-secundario {
@@ -224,10 +230,23 @@ h2 {
   gap: 14px;
 }
 
-/* Pantalla Escanear: abrir pallet */
+/* Pantalla Escanear: abrir pallet. La de ingreso usa el mismo ancho. */
 .vista-apertura {
   max-width: 560px;
   margin-inline: auto;
+}
+
+/* Mientras nadie entró no hay a dónde ir. */
+.sin-sesion .navegacion {
+  display: none;
+}
+
+.sesion-actual {
+  margin-top: 28px;
+}
+
+.sesion-actual p {
+  margin-block: 0 10px;
 }
 
 .ayuda-campo {
@@ -972,6 +991,18 @@ input {
   line-height: 1.15;
 }
 
+/* Lo que se descuenta de las órdenes: todos los pallets del día sumados por producto. */
+.totales-dia {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--chapa);
+}
+
+.totales-dia h2 {
+  margin-bottom: 10px;
+}
+
 .lista-pallets {
   display: grid;
   gap: 14px;
@@ -1008,6 +1039,12 @@ input {
   font-size: 30px;
   font-weight: 700;
   text-align: right;
+}
+
+.pallet-repetido {
+  grid-column: 1 / -1;
+  color: var(--paro);
+  font-weight: 700;
 }
 
 .pallet-ver {
@@ -1095,7 +1132,7 @@ input {
 }
 
 .dialogo::backdrop {
-  background: rgb(21 38 47 / 75%);
+  background: rgb(3 38 58 / 75%);
 }
 
 .dialogo p {

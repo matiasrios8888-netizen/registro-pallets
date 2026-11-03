@@ -16,6 +16,7 @@ import {
   normalizarCodigo,
   productosCargados,
 } from './productos.js';
+import { esSupervisor, usuario } from './sesion.js';
 import {
   avisar,
   avisarErrorDeDatos,
@@ -205,12 +206,13 @@ function escucharPalletsDe(fecha) {
   }, avisarErrorDeDatos);
 }
 
-// Deja el formulario listo con fecha de hoy, número automático y el último responsable.
+// Deja el formulario listo con fecha de hoy, número automático y el responsable: quien entró,
+// o en modo prueba el último que se escribió. Se puede cambiar igual.
 function prepararApertura() {
   numeroEscritoAMano = false;
   fechaSugerida = fechaDeHoy();
   campoFecha.value = fechaSugerida;
-  campoResponsable.value = localStorage.getItem(CLAVE_RESPONSABLE) ?? '';
+  campoResponsable.value = usuario.nombre || (localStorage.getItem(CLAVE_RESPONSABLE) ?? '');
   mensajeApertura.hidden = true;
   escucharPalletsDe(campoFecha.value);
   completarNumeroAutomatico();
@@ -385,9 +387,10 @@ function procesarCodigo(textoLeido) {
 
   const producto = buscarProducto(codigo);
   if (!producto) {
-    rechazarLectura('No se sumó: código desconocido', codigo);
+    // Solo el supervisor carga productos: los demás ven a quién pedírselo.
+    rechazarLectura('No se sumó: código desconocido', esSupervisor() ? codigo : `${codigo}. Pedile al supervisor que lo cargue.`);
     codigoDesconocido = codigo;
-    botonAgregarCodigo.hidden = false;
+    botonAgregarCodigo.hidden = !esSupervisor();
     return;
   }
 
@@ -671,7 +674,7 @@ function terminarLectura() {
   clearTimeout(temporizadorLeer);
   temporizadorLeer = null;
   botonLeer.textContent = 'Leer';
-  botonLeer.classList.replace('boton-tablero', 'boton-marcha');
+  botonLeer.classList.replace('boton-naranja', 'boton-marcha');
   cartelAcercarse.hidden = true;
 }
 
@@ -695,7 +698,7 @@ function pedirLectura() {
   clearTimeout(temporizadorLeer);
   temporizadorLeer = setTimeout(vencerLectura, TIEMPO_PARA_LEER_MS);
   botonLeer.textContent = 'Apuntá al código';
-  botonLeer.classList.replace('boton-marcha', 'boton-tablero');
+  botonLeer.classList.replace('boton-marcha', 'boton-naranja');
   mostrarEnTablero('espera', 'Apuntá al código de barras');
 }
 

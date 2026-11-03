@@ -1,5 +1,6 @@
 // Pantalla "Historial": los pallets cerrados de un día, su detalle y la exportación a Excel.
 import { borrarPallet, escucharPallets } from './datos.js';
+import { esSupervisor } from './sesion.js';
 import {
   avisar,
   avisarErrorDeDatos,
@@ -21,6 +22,8 @@ const detallesAbiertos = new Set();
 
 const campoFecha = document.getElementById('fecha-historial');
 const resumen = document.getElementById('resumen-dia');
+const totales = document.getElementById('totales-dia');
+const tablaTotales = document.getElementById('tabla-totales');
 const lista = document.getElementById('lista-pallets');
 const botonExportar = document.getElementById('btn-exportar');
 
@@ -49,7 +52,9 @@ async function eliminar(pallet) {
 }
 
 // Arma la tarjeta de un pallet. Tocar la cabecera muestra u oculta su detalle.
-function tarjetaPallet(pallet) {
+// repetido: otro pallet del mismo día tiene este número. Pasa si dos celulares cierran casi al
+// mismo tiempo, o sin señal. Solo el supervisor ve el botón para borrar.
+function tarjetaPallet(pallet, repetido) {
   const hora = new Date(pallet.cerradoEn)
     .toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
@@ -59,14 +64,15 @@ function tarjetaPallet(pallet) {
       crear('span', { class: 'pallet-total' }, cajas(pallet.totalCajas)),
       crear('span', { class: 'dato-suave' }, `${pallet.responsable}, a las ${hora}`),
       crear('span', { class: 'pallet-total' }, unidades(pallet.totalUnidades)),
+      repetido ? crear('span', { class: 'pallet-repetido' }, `Hay otro pallet ${pallet.numero} este día.`) : '',
       crear('span', { class: 'pallet-ver' })),
     crear('div', { class: 'pallet-detalle' },
       tablaDeItems(pallet.items),
-      crear('button', {
+      esSupervisor() ? crear('button', {
         type: 'button',
         class: 'boton boton-secundario',
         alHacerClic: () => eliminar(pallet),
-      }, 'Borrar pallet')));
+      }, 'Borrar pallet') : ''));
 
   tarjeta.open = detallesAbiertos.has(pallet.id);
   tarjeta.addEventListener('toggle', () => {
@@ -76,7 +82,22 @@ function tarjetaPallet(pallet) {
   return tarjeta;
 }
 
-// Dibuja el resumen del día y las tarjetas.
+// Suma los productos de todos los pallets del día, ordenados por código: es lo que se descuenta
+// de las órdenes. Suma las unidades que guardó cada pallet, sin recalcularlas: si un producto
+// se editó a mitad del día, cada pallet ya tiene bien su cuenta.
+function totalesPorProducto() {
+  const porCodigo = new Map();
+  for (const item of pallets.flatMap((pallet) => pallet.items)) {
+    const total = porCodigo.get(item.codigoInterno)
+      ?? { codigoInterno: item.codigoInterno, descripcion: item.descripcion, cajas: 0, unidades: 0 };
+    total.cajas += item.cajas;
+    total.unidades += item.unidades;
+    porCodigo.set(item.codigoInterno, total);
+  }
+  return [...porCodigo.values()].sort((a, b) => a.codigoInterno.localeCompare(b.codigoInterno));
+}
+
+// Dibuja el resumen del día, el total por producto y las tarjetas.
 function pintar() {
   const totalCajas = pallets.reduce((suma, pallet) => suma + pallet.totalCajas, 0);
   const totalUnidades = pallets.reduce((suma, pallet) => suma + pallet.totalUnidades, 0);
@@ -84,8 +105,13 @@ function pintar() {
     ? 'No hay pallets cerrados ese día.'
     : `${pallets.length} ${pallets.length === 1 ? 'pallet' : 'pallets'}: ${cajas(totalCajas)} y ${unidades(totalUnidades)}.`;
   botonExportar.disabled = pallets.length === 0;
+  totales.hidden = pallets.length === 0;
+  tablaTotales.replaceChildren(tablaDeItems(totalesPorProducto()));
+  const numeros = pallets.map((pallet) => pallet.numero);
+  const repetidos = new Set(numeros.filter((numero, i) => numeros.indexOf(numero) !== i));
   // Se muestran primero los últimos que se cerraron.
-  lista.replaceChildren(...[...pallets].reverse().map(tarjetaPallet));
+  lista.replaceChildren(...[...pallets].reverse()
+    .map((pallet) => tarjetaPallet(pallet, repetidos.has(pallet.numero))));
 }
 
 // Una fila por cada producto de cada pallet: es lo más cómodo para filtrar en Excel.
@@ -100,6 +126,21 @@ function armarFilas() {
     Unidades: item.unidades,
     'Cajas por fila × filas': item.detalleFilas ?? '',
   })));
+}
+
+// Segunda hoja del Excel: el total del día de cada producto, como la tabla de la pantalla.
+function hojaPorProducto() {
+  const filas = totalesPorProducto().map((total) => ({
+    Fecha: fechaParaMostrar(campoFecha.value),
+    Código: total.codigoInterno,
+    Descripción: total.descripcion,
+    Cajas: total.cajas,
+    Unidades: total.unidades,
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const anchoDescripcion = Math.max(40, ...filas.map((fila) => fila.Descripción.length));
+  hoja['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: anchoDescripcion }, { wch: 8 }, { wch: 10 }];
+  return hoja;
 }
 
 // En la app de Android no existen las descargas del navegador. El Excel se guarda adentro de
@@ -127,6 +168,7 @@ function exportarExcel() {
   ];
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, 'Pallets');
+  XLSX.utils.book_append_sheet(libro, hojaPorProducto(), 'Por producto');
   const nombre = `pallets-${campoFecha.value}.xlsx`;
 
   if (!window.Capacitor?.isNativePlatform()) {

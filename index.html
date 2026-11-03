@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#15262F">
+  <meta name="theme-color" content="#073B57">
   <title>Registro de pallets</title>
   <link rel="icon" href="data:,">
 
@@ -22,6 +22,29 @@
   <p id="banner-modo-prueba" class="banner" hidden>Modo prueba: los datos quedan solo en este dispositivo.</p>
 
   <main>
+    <!-- Ingreso: solo con Firebase. Cada persona entra una vez en cada dispositivo. -->
+    <section id="pantalla-ingreso" class="pantalla vista-apertura" hidden>
+      <form id="form-ingreso">
+        <h1>Entrar</h1>
+        <label class="campo" for="ingreso-usuario">Usuario
+          <input id="ingreso-usuario" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+        </label>
+        <label class="campo" for="ingreso-contrasena">Contraseña
+          <input id="ingreso-contrasena" type="password" autocomplete="current-password" required>
+        </label>
+        <p id="mensaje-ingreso" class="mensaje-error" hidden></p>
+        <button id="btn-entrar" type="submit" class="boton boton-marcha">Entrar</button>
+      </form>
+      <form id="form-nombre" hidden>
+        <h1>¿Cómo te llamás?</h1>
+        <label class="campo" for="ingreso-nombre">Nombre y apellido
+          <input id="ingreso-nombre" autocomplete="name" maxlength="40" required>
+        </label>
+        <p class="ayuda-campo">Sale como responsable de los pallets que abras. Se pide una sola vez.</p>
+        <button type="submit" class="boton boton-marcha">Guardar</button>
+      </form>
+    </section>
+
     <!-- Pantalla 1: abrir el pallet y escanear caja por caja -->
     <section id="pantalla-escaneo" class="pantalla">
 
@@ -90,7 +113,7 @@
             </label>
             <div class="campo-con-boton">
               <input id="campo-lector" inputmode="none" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" placeholder="Código">
-              <button type="submit" class="boton boton-tablero">Sumar</button>
+              <button type="submit" class="boton boton-naranja">Sumar</button>
             </div>
           </form>
 
@@ -108,7 +131,7 @@
           <p id="resumen-pallet" class="resumen" hidden></p>
           <ul id="lista-items" class="lista items"></ul>
           <div class="acciones">
-            <button id="btn-seguir-camara" type="button" class="boton boton-tablero" hidden>Seguir con la cámara</button>
+            <button id="btn-seguir-camara" type="button" class="boton boton-naranja" hidden>Seguir con la cámara</button>
             <button id="btn-cerrar" type="button" class="boton boton-marcha" disabled>Cerrar pallet</button>
             <button id="btn-descartar" type="button" class="boton boton-secundario">Descartar pallet</button>
           </div>
@@ -123,20 +146,28 @@
         <input id="fecha-historial" type="date">
       </label>
       <p id="resumen-dia" class="resumen"></p>
-      <button id="btn-exportar" type="button" class="boton boton-tablero">Exportar a Excel</button>
+      <button id="btn-exportar" type="button" class="boton boton-naranja">Exportar a Excel</button>
+      <section id="totales-dia" class="totales-dia" aria-labelledby="titulo-totales" hidden>
+        <h2 id="titulo-totales">Total por producto</h2>
+        <div id="tabla-totales"></div>
+      </section>
       <div id="lista-pallets" class="lista-pallets"></div>
     </section>
 
     <!-- Pantalla 3: tabla de productos -->
     <section id="pantalla-productos" class="pantalla" hidden>
       <h1>Productos</h1>
-      <button id="btn-escanear-producto" type="button" class="boton boton-tablero">Escanear producto nuevo</button>
+      <button id="btn-escanear-producto" type="button" class="boton boton-naranja">Escanear producto nuevo</button>
       <button id="btn-nuevo-producto" type="button" class="boton boton-secundario">Agregar producto</button>
       <button id="btn-cargar-prueba" type="button" class="boton boton-secundario" hidden>Cargar productos de prueba</button>
       <label class="campo" for="buscar-producto">Buscar
         <input id="buscar-producto" type="search" autocomplete="off" placeholder="Código o descripción">
       </label>
       <ul id="lista-productos" class="lista"></ul>
+      <div id="sesion-actual" class="sesion-actual" hidden>
+        <p id="sesion-nombre"></p>
+        <button id="btn-salir" type="button" class="boton boton-secundario">Salir</button>
+      </div>
     </section>
   </main>
 

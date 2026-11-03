@@ -12,7 +12,7 @@ Al abrirlo, Android va a pedir permiso para instalar apps de esta fuente. Despu�
 
 **Como página.** Abrí [matiasrios8888-netizen.github.io/registro-pallets](https://matiasrios8888-netizen.github.io/registro-pallets/). Solo necesita el navegador.
 
-Mientras no esté conectado Firebase, cada celular guarda sus datos adentro de la app o del navegador. La app y la página no comparten datos entre sí.
+Mientras no esté conectado Firebase, cada celular guarda sus datos adentro de la app o del navegador. La app y la página no comparten datos entre sí. Con Firebase, todos ven los mismos pallets y productos, y cada persona entra con su usuario.
 
 La pistola Bluetooth se vincula desde el Bluetooth del celular, como si fuera un teclado. Si al leer se abre el teclado de pantalla, desactivá **Mostrar teclado virtual** en los ajustes de teclado físico de Android.
 
@@ -32,6 +32,7 @@ Registro De Palets/
 │   ├── pantalla-escaneo.js Abre el pallet, suma cajas, deshace y cierra
 │   ├── pantalla-historial.js  Pallets de un día, su detalle y el Excel
 │   ├── productos.js        Busca productos por código y maneja esa pantalla
+│   ├── sesion.js           Entrar y salir, y qué puede hacer cada usuario
 │   ├── datos.js            Elige dónde guardar: Firebase o este navegador
 │   ├── datos-firebase.js   Guarda en Firestore
 │   ├── datos-local.js      Guarda en el navegador (modo prueba)
@@ -42,7 +43,7 @@ Registro De Palets/
 ├── scripts/preparar-www.mjs  Copia la app a www/ antes de armar el APK
 ├── capacitor.config.json   Nombre e identificador de la app de Android
 ├── package.json            Dependencias de Capacitor y comandos del APK
-├── firebase.json           Qué se publica en Firebase
+├── firebase.json           Dónde están las reglas de la base
 └── firestore.rules         Quién puede leer y escribir en la base
 ```
 
@@ -79,17 +80,17 @@ Tocá **Agregar a Productos**: el formulario se abre con ese código ya puesto e
 
 ## Crear el proyecto en Firebase
 
-Con esto los datos quedan en la nube y se comparten entre todos los celulares y PCs.
+Con esto los datos quedan en la nube y se comparten entre todos los celulares y PCs. Firebase guarda solo los datos y los usuarios: la página sigue en GitHub Pages.
 
-**1. Crear el proyecto.** Entrá a [console.firebase.google.com](https://console.firebase.google.com) y tocá **Crear proyecto**. Google Analytics no hace falta.
+**1. Crear el proyecto.** Entrá a [console.firebase.google.com](https://console.firebase.google.com) y tocá **Crear proyecto**. Google Analytics no hace falta. El identificador del proyecto queda en `js/config.js`, que es público: que el nombre no diga nada que no quieras mostrar.
 
-**2. Crear la base de datos.** En el menú, entrá a **Firestore Database** y tocá **Crear base de datos**. Como ubicación elegí `southamerica-east1` (San Pablo), la más cercana; después no se puede cambiar. Elegí **modo de prueba**: en el paso 5 se reemplazan esas reglas por las de este proyecto.
+**2. Crear la base de datos.** En el menú, entrá a **Firestore Database** y tocá **Crear base de datos**. Como ubicación elegí `southamerica-east1` (San Pablo), la más cercana; después no se puede cambiar. Elegí **modo de producción**: en el paso 5 se publican las reglas de este proyecto.
 
-**3. Registrar la app web.** Entrá a la rueda de **Configuración del proyecto**, bajá hasta **Tus apps** y tocá el ícono web `</>`. Ponele un nombre. No marques Hosting ahí.
+**3. Activar los usuarios.** Entrá a **Authentication**, tocá **Comenzar** y activá **Correo electrónico/contraseña**. Solo el primer interruptor. Después, en la pestaña **Configuración**, entrá a **Acciones del usuario**, destildá **Habilitar creación (registro)** y guardá. Si no, cualquiera que tenga los datos de `js/config.js` podría crearse un usuario. Desde la consola se siguen pudiendo crear.
 
-**4. Copiar los datos.** Firebase te muestra un bloque `firebaseConfig`. Copiá cada valor al mismo campo de [js/config.js](js/config.js). Al recargar la app, la franja amarilla desaparece.
+**4. Registrar la app web.** Entrá a la rueda de **Configuración del proyecto**, bajá hasta **Tus apps** y tocá el ícono web `</>`. Ponele un nombre. No marques Hosting. Firebase te muestra un bloque `firebaseConfig`: copiá cada valor al mismo campo de [js/config.js](js/config.js). Esos datos no son secretos. Al recargar la app, la franja amarilla desaparece y pide entrar.
 
-**5. Publicar.** Instalá la herramienta de Firebase una sola vez:
+**5. Publicar las reglas.** Instalá la herramienta de Firebase una sola vez:
 
 ```bash
 npm install -g firebase-tools
@@ -101,17 +102,28 @@ Iniciá sesión con tu cuenta de Google:
 firebase login
 ```
 
-Publicá la app y las reglas, cambiando `TU-PROJECT-ID` por el `projectId` de tu proyecto:
+Publicá las reglas de [firestore.rules](firestore.rules), cambiando `TU-PROJECT-ID` por el `projectId` de tu proyecto:
 
 ```bash
-firebase deploy --project TU-PROJECT-ID
+firebase deploy --only firestore:rules --project TU-PROJECT-ID
 ```
 
-Si la primera vez dice que no encuentra el sitio, entrá a **Hosting** en la consola de Firebase, tocá **Comenzar** y volvé a correr el último comando.
+Hasta publicarlas, la base no deja leer ni escribir nada. Cada vez que cambies `firestore.rules`, corré ese mismo comando de nuevo.
 
-Queda publicada en `https://TU-PROJECT-ID.web.app`. Cada vez que cambies algo, corré ese mismo comando de nuevo.
+**6. Crear los usuarios.** En **Authentication**, pestaña **Users**, tocá **Agregar usuario**, uno por persona. No hace falta un mail real: con `juan@pallets.local`, para entrar alcanza con escribir `juan`. La contraseña tiene que tener 6 caracteres o más. La primera vez que cada uno entra, la app le pide su nombre, que después sale como responsable de sus pallets.
 
-**6. Cargar los productos.** La base arranca vacía: entrá a **Productos** y tocá **Cargar productos de prueba**.
+**7. Elegir al supervisor.** Es el único que carga, cambia y borra productos, y el único que borra pallets. Los demás escanean, cierran pallets y ven el Historial. Después de que el supervisor entre por primera vez:
+
+1. En **Authentication**, copiá su **UID de usuario**.
+2. En **Firestore Database**, entrá a la colección `usuarios` y abrí el documento con ese UID.
+3. Tocá **Agregar campo**: nombre `rol`, tipo `string`, valor `supervisor`.
+4. Si el supervisor tiene la app abierta, se vuelve a cargar sola en unos segundos.
+
+El valor va todo en minúscula: con `Supervisor` no lo reconoce.
+
+**8. Cargar los productos.** La base arranca vacía. El supervisor los carga desde **Productos** con **Escanear producto nuevo**. Los productos de prueba se cargan solo en modo prueba.
+
+**9. Generar el APK de nuevo**, como dice la sección siguiente: el APK lleva adentro los datos de `js/config.js`.
 
 ## Generar el APK
 
@@ -133,6 +145,9 @@ La cámara del navegador solo funciona si la página se abre por `https`: desde 
 
 ## Cómo se comporta
 
+- **Usuarios:** con Firebase, cada persona entra una sola vez en cada dispositivo, con su usuario y su contraseña. Para entrar hace falta internet. El nombre de quien entró se completa solo como responsable, y se puede cambiar. **Salir** está al final de Productos.
+- **Supervisor:** solo el supervisor ve los botones para cargar, cambiar y borrar productos, y el de borrar pallets. Si otro escanea un código desconocido, la app le dice que se lo pida al supervisor. La base también lo controla, aunque alguien saltee los botones. En modo prueba no hay usuarios y se puede todo.
+- **Total por producto:** Historial suma todos los pallets del día por producto, que es lo que se descuenta de las órdenes. El Excel trae la misma tabla en una segunda hoja, **Por producto**. La primera hoja, **Pallets**, sigue con una fila por producto de cada pallet.
 - **Foco:** el campo de la pistola recupera el cursor solo. Si la etiqueta dice en rojo "Tocá acá para volver a leer", la app no es la ventana activa y la pistola estaría escribiendo en otro programa.
 - **Lecturas fuera de lugar:** en Historial, en Productos o antes de abrir el pallet, una lectura no suma nada. Suena la alerta y un aviso dice que no se contó.
 - **Teclado del celular:** ese campo no abre el teclado de pantalla, para que no tape el tablero. Para escribir un código, tocá **Escribir a mano**.
@@ -144,21 +159,22 @@ La cámara del navegador solo funciona si la página se abre por `https`: desde 
 - **Pallet a medio armar:** queda guardado en el dispositivo a cada lectura. Si se recarga la página o se apaga el celular, sigue ahí.
 - **Dos pestañas:** las dos muestran el mismo pallet y se actualizan solas. Si cambia con una pregunta abierta en la otra pestaña, esa pregunta se cierra sola sin hacer nada.
 - **De un día para el otro:** el formulario de Abrir pallet pasa solo a la fecha nueva, sin borrar lo que ya esté escrito. Una fecha elegida a mano no se toca. Un pallet ya abierto conserva su fecha.
-- **Numeración:** cada fecha arranca en 1. El número se elige al abrir y no se puede repetir en la misma fecha. Si otro dispositivo cerró ese número mientras tanto, el resumen y el aviso muestran con qué número queda. Sin señal, o si dos dispositivos cierran casi al mismo tiempo, pueden quedar dos pallets con el mismo número.
+- **Numeración:** cada fecha arranca en 1. El número se elige al abrir y no se puede repetir en la misma fecha. Si otro dispositivo cerró ese número mientras tanto, el resumen y el aviso muestran con qué número queda. Sin señal, o si dos dispositivos cierran casi al mismo tiempo, pueden quedar dos pallets con el mismo número. Historial los marca en rojo: "Hay otro pallet 3 este día".
 - **Cámara:** en el celular se abre como una pantalla aparte, con el contador, el video, **Deshacer** y **Cerrar cámara**. En la app de Android, la tecla Atrás también la cierra. Al cerrarla, la pantalla va al resumen del pallet, con la lista de productos y el botón **−1** para corregir antes de cerrarlo. Tiene dos modos, y cada dispositivo recuerda el último que se eligió. No lee códigos QR. Si está buscando un código y no ve ninguno durante 2 segundos, un cartel pide acercar la cámara.
 - **Tocar para leer** (el modo de arranque): cada toque del botón **Leer** cuenta una caja, igual que un gatillazo de la pistola. Después de tocar, la cámara tiene 8 segundos para encontrar un código. Si lo encuentra suena el pitido; si no, avisa en rojo y no suma nada. Sin tocar Leer no cuenta nada, aunque esté viendo un código.
 - **Modo rápido:** la cámara cuenta sola. Otro producto cuenta enseguida, y la misma caja vuelve a contar a los 2 segundos aunque no haya salido de la vista. Por eso un cartel lo avisa todo el tiempo que el modo está activo.
 - **Pistola:** cada lectura suma una caja, aunque sea el mismo código.
 - **Contar por filas:** para las cajas del medio del pallet, que no se pueden escanear sin desarmarlo. Se escanea una caja, que solo dice qué producto es y no suma, se escriben las cajas por fila y la cantidad de filas, y **Sumar** agrega el total de una vez, hasta 999 cajas. Esas cajas no se escanearon: si en el medio hay otro producto o falta una caja, la app no se entera. Por eso el resumen, el Historial y el Excel muestran cómo se contaron, como `8 × 5` (5 filas de 8 cajas), para poder volver a controlarlas.
 - **Deshacer último escaneo** saca la última caja leída. Si lo último fue un conteo por filas, pregunta y lo saca entero. El botón **−1** de cada producto saca una caja de esa fila, aunque no sea la última. Entre dos toques hay que esperar 0,4 segundos: un toque antes de tiempo no quita nada y suena la alerta.
-- **Pallet cerrado:** no se puede editar. En Historial se puede ver o borrar entero.
+- **Pallet cerrado:** no se puede editar. En Historial se puede ver, y el supervisor lo puede borrar entero.
 - **Editar un producto con el pallet abierto:** las cajas ya leídas no cambian. Las nuevas salen en otra fila, y cada fila da bien sus cuentas.
 
 ## Antes de usar datos reales
 
-- `firestore.rules` deja la base abierta a cualquiera que tenga el link, y deja de permitir todo el 1 de febrero de 2027. Hay que agregar inicio de sesión y cambiar esas reglas.
-- Si las reglas vencen, al cerrar un pallet aparece un aviso de error y las cajas vuelven a la pantalla, o vuelven al terminar el pallet que esté abierto. Ese pallet se muestra en rojo y no suma más cajas: hay que cerrarlo de nuevo. No se guarda nada hasta actualizar las reglas. En un dispositivo nuevo tampoco cargan los productos, y la app muestra ese mismo motivo. Después de corregir las reglas hay que recargar la página.
-- Problema conocido: si un pallet se cierra sin señal, se cierra la pestaña y al volver la señal Firebase rechaza el guardado, ese pallet se pierde sin aviso. Solo pasa con reglas vencidas o mal escritas. Se resuelve en la etapa de Firebase.
+- `firestore.rules` no deja leer ni escribir nada sin entrar con un usuario. Los usuarios se crean a mano en la consola de Firebase. Con **Habilitar creación (registro)** apagado, como dice el paso 3, nadie puede crearse uno solo.
+- Si la base rechaza un pallet, por ejemplo porque las reglas no se publicaron o el usuario se desactivó, aparece un aviso de error y las cajas vuelven a la pantalla, o vuelven al terminar el pallet que esté abierto. Ese pallet se muestra en rojo y no suma más cajas: hay que cerrarlo de nuevo. En un dispositivo nuevo tampoco cargan los productos, y la app muestra ese mismo motivo. Después de corregir el problema hay que recargar la página.
+- Problema conocido: si un pallet se cierra sin señal, se cierra la pestaña y al volver la señal Firebase rechaza el guardado, ese pallet se pierde sin aviso. Con las reglas publicadas solo pasa si el usuario se desactiva o se borra en ese rato.
+- Salir sin señal: lo que se cerró sin señal todavía no subió. Por eso la pregunta de **Salir** pide esperar a que vuelva la señal.
 
 ## Para quien corrija el código
 

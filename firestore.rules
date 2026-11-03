@@ -1,15 +1,46 @@
 rules_version = '2';
 
-// Reglas para la etapa de prueba: cualquiera que tenga el link puede leer y escribir, y solo
-// en las dos colecciones que usa la app. Dejan de funcionar el 1 de febrero de 2027 a propósito,
-// para que esta base abierta no quede olvidada.
+// Reglas de la base. Sin sesión no se puede leer ni escribir nada.
 //
-// Antes de cargar datos reales hay que agregar inicio de sesión y cambiar estas reglas.
+// - Productos: los ve cualquiera que haya entrado. Solo el supervisor los carga, cambia o borra.
+// - Pallets: cualquiera que haya entrado los cierra, a su nombre. Solo el supervisor los borra.
+//   Un pallet cerrado no se edita.
+// - Usuarios: cada uno ve y escribe su nombre, pero no su rol. El rol se pone a mano en la
+//   consola de Firebase, y la consola no pasa por estas reglas.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{coleccion}/{id} {
-      allow read, write: if coleccion in ['productos', 'pallets']
-        && request.time < timestamp.date(2027, 2, 1);
+    function conSesion() {
+      return request.auth != null;
+    }
+
+    function esSupervisor() {
+      return conSesion()
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('rol', '') == 'supervisor';
+    }
+
+    function nombreValido() {
+      return request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0
+        && request.resource.data.nombre.size() <= 40;
+    }
+
+    match /productos/{id} {
+      allow read: if conSesion();
+      allow create, update, delete: if esSupervisor();
+    }
+
+    match /pallets/{id} {
+      allow read: if conSesion();
+      allow create: if conSesion() && request.resource.data.creadoPor == request.auth.uid;
+      allow delete: if esSupervisor();
+    }
+
+    match /usuarios/{uid} {
+      allow read: if conSesion() && request.auth.uid == uid;
+      allow create: if conSesion() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['nombre']) && nombreValido();
+      allow update: if conSesion() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nombre']) && nombreValido();
     }
   }
 }

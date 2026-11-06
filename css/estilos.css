@@ -161,6 +161,15 @@ h2 {
   touch-action: manipulation;
 }
 
+/* Un enlace con aspecto de botón. */
+a.boton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+}
+
 .boton:active {
   border-bottom-width: 2px;
   transform: translateY(4px);
@@ -802,6 +811,67 @@ input {
   font-weight: 500;
 }
 
+/* Tipo de envase de un producto: dos opciones grandes, para tocarlas con guantes. */
+.campo-envase {
+  margin: 14px 0;
+  padding: 0;
+  border: 0;
+}
+
+.campo-envase legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-weight: 600;
+}
+
+.opcion-envase {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 68px;
+  border: 3px solid var(--gabinete);
+  border-radius: 8px;
+  background: #fff;
+  font-family: var(--letra-angosta);
+  font-size: 26px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.opcion-envase input {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--tablero);
+}
+
+.opcion-envase:has(input:checked) {
+  border-color: var(--tablero);
+  background: var(--neutro);
+}
+
+.opcion-envase:has(input:focus-visible) {
+  outline: 3px solid var(--marca-celeste);
+  outline-offset: 2px;
+}
+
+/* En los celulares angostos "Contenedora" no entraría al lado del círculo. */
+@media (max-width: 420px) {
+  .opcion-envase {
+    gap: 6px;
+    font-size: 22px;
+  }
+
+  .opcion-envase input {
+    width: 22px;
+    height: 22px;
+  }
+}
+
 /* Listas */
 .lista {
   margin: 0;
@@ -871,6 +941,10 @@ input {
 .dato-suave {
   color: var(--tinta-suave);
   font-size: 18px;
+}
+
+.dato-envase {
+  font-weight: 600;
 }
 
 .fila-botones {

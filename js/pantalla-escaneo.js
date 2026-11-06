@@ -1,5 +1,5 @@
 // Pantalla "Escanear": primero se abre el pallet y después se escanea caja por caja.
-import { escucharPallets, guardarPallet } from './datos.js';
+import { claveLocal, escucharPallets, guardarPallet } from './datos.js';
 import {
   apagarCamara,
   detectarLecturaPerdida,
@@ -33,10 +33,10 @@ import {
   unidades,
 } from './ui.js';
 
-const CLAVE_PALLET_ABIERTO = 'registro-pallets.pallet-abierto';
-const CLAVE_RESPONSABLE = 'registro-pallets.responsable';
-const CLAVE_RECHAZADOS = 'registro-pallets.pallets-rechazados';
-const CLAVE_MODO_CAMARA = 'registro-pallets.modo-camara';
+const CLAVE_PALLET_ABIERTO = claveLocal('pallet-abierto');
+const CLAVE_RESPONSABLE = claveLocal('responsable');
+const CLAVE_RECHAZADOS = claveLocal('pallets-rechazados');
+const CLAVE_MODO_CAMARA = claveLocal('modo-camara');
 const DURACION_VERDE_MS = 1200;
 const ESPERA_ENTRE_QUITAS_MS = 400;
 const ESPERA_ENTRE_TOQUES_DE_LEER_MS = 400;

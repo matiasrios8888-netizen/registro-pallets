@@ -2,8 +2,10 @@
 // Tiene las mismas funciones que datos-firebase.js.
 import { productosDePrueba } from './datos-prueba.js';
 
-const CLAVE_PRODUCTOS = 'registro-pallets.v2.productos';
-const CLAVE_PALLETS = 'registro-pallets.v2.pallets';
+// No usa claveLocal() de datos.js: este archivo se carga desde ahí, y se esperarían el uno al
+// otro. Es lo mismo, porque este archivo solo existe en modo prueba.
+const CLAVE_PRODUCTOS = 'registro-pallets.prueba.productos';
+const CLAVE_PALLETS = 'registro-pallets.prueba.pallets';
 
 // Funciones que hay que volver a llamar cuando cambian los datos.
 const oyentes = new Set();

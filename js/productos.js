@@ -16,6 +16,10 @@ import {
 
 const UNIDADES_POR_CAJA_MAXIMAS = 100000;
 
+// Cada fila de la tabla es un código de barras, y cada código es un envase del producto: la caja
+// contenedora o la unidad de venta (U.V), que es la cajita o bolsa de adentro.
+const NOMBRE_ENVASE = { contenedora: 'Contenedora', uv: 'U.V' };
+
 let productos = [];
 let cargados = false;
 let errorDeCarga = null;
@@ -59,6 +63,16 @@ function unidadesValidas(valor) {
   return numero <= UNIDADES_POR_CAJA_MAXIMAS ? numero : 0;
 }
 
+// En la base va 'contenedora' o 'uv'. Uno cargado a mano en la consola puede decir "U.V" o "UV",
+// y los que se cargaron antes de que existiera el envase no traen nada: son contenedoras.
+function envaseValido(valor) {
+  return /^u\.?\s*v\.?$/i.test(String(valor ?? '').trim()) ? 'uv' : 'contenedora';
+}
+
+// En las etiquetas reales, hasta ahora, el código de la contenedora empieza con 2 y el de la U.V
+// con 1. Solo sirve para dejar marcada una opción en el formulario: se ve y se puede cambiar.
+const envaseSegunCodigo = (codigo) => (/^1\d{13}$/.test(codigo) ? 'uv' : 'contenedora');
+
 // Un producto cargado a mano desde la consola de Firebase puede traer campos que faltan o
 // números guardados como texto. Acá todos quedan con la misma forma.
 const productoCompleto = (producto) => ({
@@ -66,6 +80,7 @@ const productoCompleto = (producto) => ({
   codigoBarras: String(producto.codigoBarras ?? ''),
   codigoInterno: String(producto.codigoInterno ?? ''),
   descripcion: String(producto.descripcion ?? ''),
+  envase: envaseValido(producto.envase),
   unidadesPorCaja: unidadesValidas(producto.unidadesPorCaja),
 });
 
@@ -76,24 +91,40 @@ function claveDeBusqueda(codigo) {
   return /^\d+$/.test(normalizado) ? normalizado.replace(/^0+/, '') : normalizado;
 }
 
-// Dice si la clave coincide con alguno de los dos códigos del producto.
-function tieneElCodigo(producto, clave) {
-  return claveDeBusqueda(producto.codigoInterno) === clave
-    || claveDeBusqueda(producto.codigoBarras) === clave;
-}
-
-// Busca por los dos códigos, porque todavía no sabemos cuál traen las cajas.
+// Busca primero por código de barras, que es de una sola fila. Si se escribió el código interno,
+// que comparten la contenedora y la U.V, devuelve la contenedora: es la caja que se cuenta.
 // Devuelve el producto, o undefined si no está.
 export function buscarProducto(codigo) {
   const clave = claveDeBusqueda(codigo);
-  return clave ? productos.find((producto) => tieneElCodigo(producto, clave)) : undefined;
+  if (!clave) return undefined;
+  const conEseInterno = productos.filter((p) => claveDeBusqueda(p.codigoInterno) === clave);
+  return productos.find((p) => claveDeBusqueda(p.codigoBarras) === clave)
+    ?? conEseInterno.find((p) => p.envase === 'contenedora')
+    ?? conEseInterno[0];
 }
 
-// Busca otro producto que ya use ese código. idPropio evita encontrarse a sí mismo al editar.
-function productoQueYaUsa(codigo, idPropio) {
-  const clave = claveDeBusqueda(codigo);
-  if (!clave) return undefined;
-  return productos.find((p) => p.id !== idPropio && tieneElCodigo(p, clave));
+// Busca otra fila que choque con estos datos. idPropio evita encontrarse a sí misma al editar.
+// Un código de barras va en una sola fila, y no puede ser el código interno de nadie. El código
+// interno se repite en la contenedora y la U.V de un producto, pero no hay dos contenedoras ni
+// dos U.V del mismo producto: no se sabría cuántas unidades trae.
+function filaQueChoca({ codigoBarras = '', codigoInterno = '', envase }, idPropio) {
+  const barras = claveDeBusqueda(codigoBarras);
+  const interno = claveDeBusqueda(codigoInterno);
+  return productos.find((p) => p.id !== idPropio && (
+    (barras && (claveDeBusqueda(p.codigoBarras) === barras || claveDeBusqueda(p.codigoInterno) === barras))
+    || (interno && claveDeBusqueda(p.codigoBarras) === interno)
+    || (interno && claveDeBusqueda(p.codigoInterno) === interno && p.envase === envase)));
+}
+
+// Así se nombra una fila en los avisos: "KD0324 U.V".
+const nombreDeFila = (producto) => `${producto.codigoInterno} ${NOMBRE_ENVASE[producto.envase]}`;
+
+// Explica con qué fila choca lo que se quiso guardar.
+function avisoDeRepetido(fila, datos) {
+  if (claveDeBusqueda(fila.codigoInterno) === claveDeBusqueda(datos.codigoInterno) && fila.envase === datos.envase) {
+    return `${nombreDeFila(fila)} ya está cargado, con el código ${fila.codigoBarras || 'sin código de barras'}. Para cambiarlo, editá esa fila.`;
+  }
+  return `Ese código ya lo usa ${nombreDeFila(fila)}: ${fila.descripcion}.`;
 }
 
 // Abre el formulario con esos datos. Si el producto trae id es una edición; si no, uno nuevo.
@@ -104,6 +135,7 @@ function abrirFormulario(producto) {
   campoBarras.value = producto.codigoBarras ?? '';
   campoInterno.value = producto.codigoInterno ?? '';
   campoDescripcion.value = producto.descripcion ?? '';
+  formulario.elements.envase.value = producto.envase ?? envaseSegunCodigo(campoBarras.value);
   campoUnidades.value = producto.unidadesPorCaja ?? '';
   mensajeFormulario.hidden = true;
   // Desde Escanear el código ya vino leído, y la cámara de esa pantalla puede seguir prendida.
@@ -132,10 +164,6 @@ function mostrarErrorDeFormulario(mensaje) {
   mensajeFormulario.hidden = false;
 }
 
-// Dos productos con el mismo código harían que la búsqueda elija cualquiera de los dos.
-const avisoDeRepetido = (producto) => (
-  `Ese código ya lo usa ${producto.codigoInterno}: ${producto.descripcion}.`);
-
 // Apaga la cámara del formulario y deja el botón como al principio.
 function apagarLectura() {
   leyendo = false;
@@ -149,14 +177,30 @@ function apagarLectura() {
 function alLeerCodigoDeBarras(codigo) {
   apagarLectura();
   campoBarras.value = normalizarCodigo(codigo);
-  const repetido = productoQueYaUsa(campoBarras.value, productoEnEdicion?.id);
+  sugerirEnvase();
+  const datos = { codigoBarras: campoBarras.value };
+  const repetido = filaQueChoca(datos, productoEnEdicion?.id);
   if (repetido) {
     senalError();
-    mostrarErrorDeFormulario(avisoDeRepetido(repetido));
+    mostrarErrorDeFormulario(avisoDeRepetido(repetido, datos));
     return;
   }
   senalOk();
   enfocarCampoQueFalta();
+}
+
+// En un producto nuevo, marca el envase que suele llevar ese código. Al editar no lo toca: ya
+// lo eligió alguien.
+function sugerirEnvase() {
+  if (!productoEnEdicion) formulario.elements.envase.value = envaseSegunCodigo(normalizarCodigo(campoBarras.value));
+}
+
+// Al cargar el segundo código de un producto que ya está, completa la descripción con la que
+// ya tiene, si todavía no se escribió otra.
+function completarDescripcion() {
+  const interno = claveDeBusqueda(campoInterno.value);
+  const mismoProducto = productos.find((p) => claveDeBusqueda(p.codigoInterno) === interno);
+  if (interno && mismoProducto && !campoDescripcion.value.trim()) campoDescripcion.value = mismoProducto.descripcion;
 }
 
 // Prende la cámara adentro del formulario. Si no puede, se sigue cargando a mano.
@@ -214,6 +258,7 @@ function guardarFormulario(evento) {
     codigoBarras: normalizarCodigo(campoBarras.value),
     codigoInterno: normalizarCodigo(campoInterno.value),
     descripcion: campoDescripcion.value.trim(),
+    envase: formulario.elements.envase.value,
     unidadesPorCaja: Number(campoUnidades.value),
   };
 
@@ -223,22 +268,22 @@ function guardarFormulario(evento) {
     return;
   }
 
-  const repetido = productoQueYaUsa(datos.codigoInterno, id) ?? productoQueYaUsa(datos.codigoBarras, id);
+  const repetido = filaQueChoca(datos, id);
   if (repetido) {
-    mostrarErrorDeFormulario(avisoDeRepetido(repetido));
+    mostrarErrorDeFormulario(avisoDeRepetido(repetido, datos));
     return;
   }
 
   guardarProducto(id ? { ...datos, id } : datos).catch(avisarErrorDeDatos);
   dialogo.close();
   if (alGuardarFormulario) alGuardarFormulario();
-  else avisar(`${datos.codigoInterno} guardado`);
+  else avisar(`${nombreDeFila(datos)} guardado`);
 }
 
-// Borra un producto, después de preguntar.
+// Borra una fila, después de preguntar.
 async function eliminar(producto) {
   const borrar = await confirmar({
-    titulo: `¿Borrar ${producto.codigoInterno}?`,
+    titulo: `¿Borrar ${nombreDeFila(producto)}?`,
     detalle: `${producto.descripcion}. Los pallets ya cerrados no cambian.`,
     si: 'Borrar producto',
     peligro: true,
@@ -246,13 +291,13 @@ async function eliminar(producto) {
   if (borrar) borrarProducto(producto.id).catch(avisarErrorDeDatos);
 }
 
-// Arma la fila de un producto. Los botones Editar y Borrar son solo para el supervisor.
+// Arma la fila de un código de barras. Los botones Editar y Borrar son solo para el supervisor.
 function filaProducto(producto) {
   return crear('li', { class: 'fila-producto' },
     crear('div', { class: 'fila-datos' },
       crear('strong', { class: 'codigo' }, producto.codigoInterno),
       crear('span', {}, producto.descripcion),
-      crear('span', {}, `${unidades(producto.unidadesPorCaja)} por caja`),
+      crear('span', { class: 'dato-envase' }, `${NOMBRE_ENVASE[producto.envase]} de ${unidades(producto.unidadesPorCaja)}`),
       crear('span', { class: 'dato-suave' },
         producto.codigoBarras ? `Código de barras ${producto.codigoBarras}` : 'Sin código de barras')),
     esSupervisor() ? crear('div', { class: 'fila-botones' },
@@ -271,12 +316,15 @@ function filaProducto(producto) {
       }, 'Borrar')) : '');
 }
 
-// Dibuja la lista ordenada por código interno, aplicando el texto de Buscar.
+// Dibuja la lista aplicando el texto de Buscar. Ordena por código interno, y en cada producto
+// va primero la contenedora: así sus dos códigos quedan juntos.
 function pintarLista() {
   const filtro = buscador.value.trim().toUpperCase();
   const visibles = productos
-    .filter((p) => `${p.codigoInterno} ${p.codigoBarras} ${p.descripcion}`.toUpperCase().includes(filtro))
-    .sort((a, b) => a.codigoInterno.localeCompare(b.codigoInterno));
+    .filter((p) => `${p.codigoInterno} ${p.codigoBarras} ${p.descripcion} ${NOMBRE_ENVASE[p.envase]}`
+      .toUpperCase().includes(filtro))
+    .sort((a, b) => a.codigoInterno.localeCompare(b.codigoInterno)
+      || (a.envase === 'uv') - (b.envase === 'uv'));
 
   lista.replaceChildren(...visibles.map(filaProducto));
   if (visibles.length === 0) {
@@ -287,7 +335,7 @@ function pintarLista() {
   botonCargarPrueba.hidden = !modoPrueba || productos.length > 0;
 }
 
-// Guarda los 4 productos de prueba en la base.
+// Guarda los productos de prueba en la base: 4 productos, con 2 códigos cada uno.
 function cargarProductosDePrueba() {
   productosDePrueba.forEach((producto) => guardarProducto(producto).catch(avisarErrorDeDatos));
   avisar('Productos de prueba cargados');
@@ -299,7 +347,9 @@ function cargarProductosDePrueba() {
 function pasarAlCampoSiguiente(evento) {
   if (evento.key !== 'Enter' || !evento.target.matches('input')) return;
   evento.preventDefault();
-  const siguiente = camposEnOrden[camposEnOrden.indexOf(evento.target) + 1];
+  const posicion = camposEnOrden.indexOf(evento.target);
+  // En las opciones de envase no se escribe: si la lectura cayó ahí, se perdió.
+  const siguiente = posicion === -1 ? undefined : camposEnOrden[posicion + 1];
   if (siguiente) siguiente.focus();
   else senalError();
 }
@@ -316,6 +366,8 @@ export function iniciarProductos() {
   // Solo el supervisor carga y cambia productos: los demás ven la lista, nada más.
   document.getElementById('btn-escanear-producto').hidden = !esSupervisor();
   document.getElementById('btn-nuevo-producto').hidden = !esSupervisor();
+  // La hoja de códigos está en la página web, no adentro de la app de Android.
+  document.getElementById('enlace-codigos-prueba').hidden = !modoPrueba || Boolean(window.Capacitor?.isNativePlatform());
 
   escucharProductos((listaNueva) => {
     productos = listaNueva.map(productoCompleto);
@@ -339,6 +391,8 @@ export function iniciarProductos() {
   document.getElementById('btn-cancelar-producto').addEventListener('click', () => dialogo.close());
   formulario.addEventListener('submit', guardarFormulario);
   formulario.addEventListener('keydown', pasarAlCampoSiguiente);
+  campoBarras.addEventListener('change', sugerirEnvase);
+  campoInterno.addEventListener('change', completarDescripcion);
   // Sale por cualquier lado (Guardar, Cancelar, tecla Atrás): la cámara no puede quedar prendida.
   // Sin leyendo apagaría la de la pantalla Escanear, que sigue abierta atrás del formulario.
   dialogo.addEventListener('close', () => {

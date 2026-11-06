@@ -160,6 +160,7 @@
       <button id="btn-escanear-producto" type="button" class="boton boton-naranja">Escanear producto nuevo</button>
       <button id="btn-nuevo-producto" type="button" class="boton boton-secundario">Agregar producto</button>
       <button id="btn-cargar-prueba" type="button" class="boton boton-secundario" hidden>Cargar productos de prueba</button>
+      <a id="enlace-codigos-prueba" href="codigos-prueba.html" target="_blank" class="boton boton-secundario" hidden>Ver códigos de prueba</a>
       <label class="campo" for="buscar-producto">Buscar
         <input id="buscar-producto" type="search" autocomplete="off" placeholder="Código o descripción">
       </label>
@@ -233,7 +234,15 @@
       <label class="campo" for="campo-descripcion">Descripción
         <input id="campo-descripcion" required autocomplete="off">
       </label>
-      <label class="campo" for="campo-unidades">Unidades por caja
+      <!-- Cada código de barras es un envase: la caja contenedora o la unidad de venta (U.V) -->
+      <fieldset class="campo-envase">
+        <legend>Tipo de envase</legend>
+        <div class="dos-botones">
+          <label class="opcion-envase"><input type="radio" name="envase" value="contenedora" checked> Contenedora</label>
+          <label class="opcion-envase"><input type="radio" name="envase" value="uv"> U.V</label>
+        </div>
+      </fieldset>
+      <label class="campo" for="campo-unidades">Unidades en ese envase
         <input id="campo-unidades" type="number" min="1" max="100000" step="1" inputmode="numeric" required>
       </label>
       <p id="mensaje-formulario" class="mensaje-error" hidden></p>

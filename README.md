@@ -36,7 +36,7 @@ Registro De Palets/
 │   ├── datos.js            Elige dónde guardar: Firebase o este navegador
 │   ├── datos-firebase.js   Guarda en Firestore
 │   ├── datos-local.js      Guarda en el navegador (modo prueba)
-│   ├── datos-prueba.js     Los 4 productos inventados
+│   ├── datos-prueba.js     Los productos inventados: 4, con 2 códigos cada uno
 │   ├── config.js           Los datos de conexión a Firebase
 │   └── ui.js               Herramientas comunes: sonidos, avisos y preguntas
 ├── android/                El proyecto de Android que genera el APK
@@ -47,9 +47,13 @@ Registro De Palets/
 └── firestore.rules         Quién puede leer y escribir en la base
 ```
 
-## Probar la pantalla de escaneo (sin Firebase)
+## Probar con datos inventados (modo prueba)
 
-Hace falta un "servidor local": si abrís `index.html` con doble clic, el navegador bloquea los archivos de JavaScript.
+Con `?prueba` al final de la dirección, la página abre en modo prueba: no pide usuario, no usa Firebase y trae productos inventados. Lo que se cargue queda solo en ese navegador, aparte de los datos de verdad. Lo avisa la franja amarilla de arriba. La app de Android siempre usa Firebase.
+
+**En el celular o en cualquier PC:** abrí [matiasrios8888-netizen.github.io/registro-pallets/?prueba](https://matiasrios8888-netizen.github.io/registro-pallets/?prueba).
+
+**En esta PC, con los cambios sin publicar:** hace falta un "servidor local", porque si abrís `index.html` con doble clic el navegador bloquea los archivos de JavaScript.
 
 **1.** Abrí una terminal en la carpeta del proyecto y corré:
 
@@ -57,15 +61,13 @@ Hace falta un "servidor local": si abrís `index.html` con doble clic, el navega
 python -m http.server 5500
 ```
 
-**2.** Abrí en el navegador `http://localhost:5500`. Los 4 productos de prueba ya están cargados.
+**2.** Abrí en el navegador `http://localhost:5500/?prueba`. Sin `?prueba` abre conectada a la base de verdad.
 
 **3.** Completá **Responsable** y tocá **Abrir pallet**. El número y la fecha se completan solos, y los dos se pueden cambiar.
 
-**4.** Abrí `http://localhost:5500/codigos-prueba.html` en otra pestaña e imprimí la hoja o mostrala en la pantalla del celular.
+**4.** En **Productos**, tocá **Ver códigos de prueba**. Imprimí la hoja o mostrala en otra pantalla. Cada producto trae dos códigos: el de la caja contenedora y el de la unidad de venta (U.V).
 
-**5.** Volvé a la pestaña de la app. Cuando diga **Lector listo** en verde, disparale con la pistola a un código. También podés escribir `KD0324` con el teclado y apretar Enter, que es lo mismo que hace la pistola.
-
-En este modo los datos quedan solo en ese navegador. Lo avisa la franja amarilla de arriba.
+**5.** Volvé a **Escanear**. Cuando diga **Lector listo** en verde, disparale con la pistola a un código. También podés escribir `KD0324` con el teclado y apretar Enter, que es lo mismo que hace la pistola.
 
 Para cortar el servidor, apretá `Ctrl + C` en la terminal.
 
@@ -74,7 +76,7 @@ Para cortar el servidor, apretá `Ctrl + C` en la terminal.
 Abrí un pallet y escaneá una caja real. Va a aparecer en rojo "código desconocido" con el código que leyó, en mayúsculas.
 
 - Si dice algo como `KD0324`, el código de barras trae el código interno.
-- Si son 13 números, es un EAN.
+- Si son 14 números, es un ITF-14, como el de las etiquetas que se probaron hasta ahora.
 
 Tocá **Agregar a Productos**: el formulario se abre con ese código ya puesto en el campo que corresponde. Completá el resto, guardá y escaneá la caja de nuevo.
 
@@ -152,8 +154,9 @@ La cámara del navegador solo funciona si la página se abre por `https`: desde 
 - **Lecturas fuera de lugar:** en Historial, en Productos o antes de abrir el pallet, una lectura no suma nada. Suena la alerta y un aviso dice que no se contó.
 - **Teclado del celular:** ese campo no abre el teclado de pantalla, para que no tape el tablero. Para escribir un código, tocá **Escribir a mano**.
 - **Abrir pallet:** solo se abre tocando el botón, nunca con Enter. El número va de 1 a 9999 y la fecha puede estar hasta 31 días antes o después de hoy. El responsable no acepta 4 cifras seguidas ni un código de producto. Esos controles frenan una lectura que cayó en el campo equivocado.
-- **Agregar o editar producto:** solo se guarda tocando el botón. Unidades por caja llega hasta 100.000.
-- **Escanear producto nuevo:** abre el formulario con la cámara prendida. Apenas lee el código de barras, suena el pitido, el número queda en su campo y la cámara se apaga. El código de barras solo trae ese número: el código interno, la descripción y las unidades por caja se escriben a mano una sola vez, mirando la etiqueta. Si el código ya es de otro producto, lo avisa enseguida. El botón **Leer con la cámara** hace lo mismo adentro del formulario, por ejemplo para cambiarle el código a un producto que ya existe.
+- **Productos y envases:** en Productos hay una fila por código de barras. Cada producto puede tener dos: el de la caja contenedora y el de la unidad de venta (U.V), que es la cajita o la bolsa de adentro. Las dos filas comparten el código interno y cada una dice cuántas unidades trae su envase. Un producto no puede tener dos contenedoras ni dos U.V. Si se escribe el código interno en vez de escanear, cuenta la contenedora. Los productos cargados antes de esto son contenedoras.
+- **Agregar o editar producto:** solo se guarda tocando el botón. Las unidades del envase llegan hasta 100.000. Si el código de barras empieza con 1 queda marcado U.V, y si no, Contenedora, como en las etiquetas reales: se puede cambiar antes de guardar. Al escribir el código interno de un producto que ya está, la descripción se completa sola.
+- **Escanear producto nuevo:** abre el formulario con la cámara prendida. Apenas lee el código de barras, suena el pitido, el número queda en su campo y la cámara se apaga. El código de barras solo trae ese número: el código interno, la descripción, el tipo de envase y sus unidades se escriben a mano una sola vez, mirando la etiqueta. Si el código ya es de otro producto, lo avisa enseguida. El botón **Leer con la cámara** hace lo mismo adentro del formulario, por ejemplo para cambiarle el código a un producto que ya existe.
 - **Sin señal:** en modo prueba no hace falta internet para nada. Con Firebase, con la app ya abierta se puede seguir escaneando y cerrando pallets, y se suben solos cuando vuelve la conexión. Para abrirla de cero sí hace falta internet, porque Firebase se baja al arrancar.
 - **Excel en la app de Android:** en vez de bajar el archivo, abre el menú Compartir para mandarlo por WhatsApp, por mail o guardarlo en Archivos.
 - **Pallet a medio armar:** queda guardado en el dispositivo a cada lectura. Si se recarga la página o se apaga el celular, sigue ahí.

@@ -89,7 +89,7 @@ await captura('1-abrir');
 // Bluetooth es un teclado físico y Android no abre el de pantalla, salvo que el celular lo pida.
 await abrirPallet('Diagnostico');
 console.log('metodos de entrada:', (await consola('ime list -s')).trim().replace(/\s+/g, ' '));
-for (const codigo of ['KD0324', '2000324000012', 'TC0110', '2000324000012']) await leerConPistola(codigo);
+for (const codigo of ['KD0324', '22000000003249', 'TC0110', '22000000003249']) await leerConPistola(codigo);
 await captura('2a-con-teclado-de-pantalla');
 await pagina.locator('#btn-descartar').click();
 await esperar(500);
@@ -111,7 +111,7 @@ const teclado = await consola('dumpsys input_method');
 comprobar('no se abre el teclado de pantalla', !/mInputShown=true/.test(teclado));
 
 await leerConPistola('KD0324');
-await leerConPistola('2000324000012');
+await leerConPistola('22000000003249');
 await leerConPistola('TC0110');
 const contador = await pagina.locator('#contador').textContent();
 comprobar('la pistola sumó 3 cajas', contador === '3', contador);
@@ -192,7 +192,7 @@ comprobar('sin errores de página', errores.length === 0, errores.join(' | '));
 await consola(`am force-stop ${PAQUETE}`);
 await esperar(1500);
 pagina = await abrirApp();
-const guardados = await pagina.evaluate(() => JSON.parse(localStorage.getItem('registro-pallets.v2.pallets') ?? '[]').length);
+const guardados = await pagina.evaluate(() => JSON.parse(localStorage.getItem('registro-pallets.prueba.pallets') ?? '[]').length);
 comprobar('los datos siguen al reabrir', guardados === 1, String(guardados));
 await captura('8-reabierta');
 

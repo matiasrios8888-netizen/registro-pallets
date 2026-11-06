@@ -124,7 +124,12 @@
             <button id="btn-escribir" type="button" class="boton boton-secundario solo-tactil">Escribir a mano</button>
           </div>
 
-          <button id="btn-filas" type="button" class="boton boton-secundario">Contar por filas</button>
+          <!-- Caja por caja: cada lectura suma una caja. Código + cantidad: cada lectura abre una
+               ventana para escribir cuántas cajas de ese producto se suman. -->
+          <div class="modo-carga" role="group" aria-label="Modo de carga">
+            <button id="btn-carga-cajas" type="button" aria-pressed="true">Caja por caja</button>
+            <button id="btn-carga-cantidad" type="button" aria-pressed="false">Código + cantidad</button>
+          </div>
         </div>
 
         <div class="columna">
@@ -207,23 +212,30 @@
     </form>
   </dialog>
 
-  <!-- Ventana para sumar de una vez las cajas que no se pueden escanear -->
-  <dialog id="dialogo-filas" class="dialogo">
-    <form id="form-filas">
-      <h2>Contar por filas</h2>
-      <p id="filas-producto"></p>
+  <!-- Modo Código + cantidad: cuántas cajas del producto escaneado se suman de una vez.
+       Se escribe el total, o se cuenta por filas las cajas del medio del pallet. -->
+  <dialog id="dialogo-cantidad" class="dialogo">
+    <form id="form-cantidad">
+      <h2>Cargar cantidad</h2>
+      <p id="cantidad-producto"></p>
+      <p id="cantidad-envase" class="dato-envase"></p>
+      <label class="campo" for="cantidad-cajas">Cajas
+        <input id="cantidad-cajas" type="number" min="1" step="1" inputmode="numeric" autocomplete="off">
+      </label>
+      <p class="ayuda-cantidad">O contalas por filas, por ejemplo las del medio del pallet:</p>
       <div class="dos-botones">
-        <label class="campo" for="filas-cajas">Cajas por fila
-          <input id="filas-cajas" type="number" min="1" step="1" inputmode="numeric" autocomplete="off" required>
+        <label class="campo" for="cantidad-por-fila">Cajas por fila
+          <input id="cantidad-por-fila" type="number" min="1" step="1" inputmode="numeric" autocomplete="off">
         </label>
-        <label class="campo" for="filas-cantidad">Filas
-          <input id="filas-cantidad" type="number" min="1" step="1" inputmode="numeric" autocomplete="off" required>
+        <label class="campo" for="cantidad-filas">Filas
+          <input id="cantidad-filas" type="number" min="1" step="1" inputmode="numeric" autocomplete="off">
         </label>
       </div>
-      <p id="filas-cuenta" class="resumen"></p>
+      <p id="cantidad-cuenta" class="resumen"></p>
+      <p id="cantidad-aviso" class="mensaje-error" hidden></p>
       <div class="dos-botones">
-        <button id="btn-cancelar-filas" type="button" class="boton boton-secundario">Cancelar</button>
-        <button id="btn-sumar-filas" type="submit" class="boton boton-marcha" disabled>Sumar</button>
+        <button id="btn-cancelar-cantidad" type="button" class="boton boton-secundario">Cancelar</button>
+        <button id="btn-sumar-cantidad" type="submit" class="boton boton-marcha" disabled>Sumar</button>
       </div>
     </form>
   </dialog>
@@ -274,6 +286,10 @@
       <label class="campo" for="campo-unidades">Unidades en ese envase
         <input id="campo-unidades" type="number" min="1" max="100000" step="1" inputmode="numeric" required>
       </label>
+      <label class="campo" for="campo-cajas-por-pallet">Cajas en un pallet completo
+        <input id="campo-cajas-por-pallet" type="number" min="1" max="9999" step="1" inputmode="numeric" autocomplete="off">
+      </label>
+      <p class="ayuda-campo">Si lo sabés. Con este dato, al cargar un pallet avisa si se pasa.</p>
       <p id="mensaje-formulario" class="mensaje-error" hidden></p>
       <div class="dos-botones">
         <button id="btn-cancelar-producto" type="button" class="boton boton-secundario">Cancelar</button>

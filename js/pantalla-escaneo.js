@@ -18,6 +18,7 @@ import {
 } from './productos.js';
 import { esSupervisor, usuario } from './sesion.js';
 import {
+  NOMBRE_ENVASE,
   avisar,
   avisarErrorDeDatos,
   cajas,
@@ -26,7 +27,7 @@ import {
   fechaDeHoy,
   fechaParaMostrar,
   motivoDelError,
-  notaPorFilas,
+  notaAMano,
   senalError,
   senalOk,
   tablaDeItems,
@@ -37,13 +38,14 @@ const CLAVE_PALLET_ABIERTO = claveLocal('pallet-abierto');
 const CLAVE_RESPONSABLE = claveLocal('responsable');
 const CLAVE_RECHAZADOS = claveLocal('pallets-rechazados');
 const CLAVE_MODO_CAMARA = claveLocal('modo-camara');
+const CLAVE_MODO_CARGA = claveLocal('modo-carga');
 const DURACION_VERDE_MS = 1200;
 const ESPERA_ENTRE_QUITAS_MS = 400;
 const ESPERA_ENTRE_TOQUES_DE_LEER_MS = 400;
 const TIEMPO_PARA_LEER_MS = 8000;
 const ESPERA_PARA_PEDIR_QUE_SE_ACERQUE_MS = 2000;
 const ESPERA_EN_MODO_RAPIDO_MS = 2000;
-const MAXIMO_CAJAS_POR_FILAS = 999;
+const MAXIMO_CAJAS_A_MANO = 999;
 const ALTO_BARRA_INFERIOR = 100;
 const DIAS_DE_MARGEN_EN_LA_FECHA = 31;
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
@@ -70,9 +72,11 @@ let ultimaVezQueVioUnCodigo = 0;
 let ultimaCajaContada = null;
 let momentoDeLaUltimaCaja = 0;
 
-// Contar por filas: la próxima lectura no suma, solo dice de qué producto son las cajas.
-let esperandoCajaDeFilas = false;
-let productoDeFilas = null;
+// Modo Código + cantidad: cada lectura no suma, solo dice de qué producto son las cajas, y la
+// cantidad se escribe en una ventana. Queda elegido en el dispositivo, como el de la cámara.
+let modoCantidad = localStorage.getItem(CLAVE_MODO_CARGA) === 'cantidad';
+// El producto de la ventana de cantidad abierta.
+let productoDeCantidad = null;
 
 // Pallets ya cerrados en la fecha elegida: para saber qué número le toca al siguiente.
 let palletsDeLaFecha = [];
@@ -103,13 +107,16 @@ const botonAgregarCodigo = document.getElementById('btn-agregar-codigo');
 const formularioLector = document.getElementById('form-lector');
 const campoLector = document.getElementById('campo-lector');
 const botonDeshacer = document.getElementById('btn-deshacer');
-const botonFilas = document.getElementById('btn-filas');
-const dialogoFilas = document.getElementById('dialogo-filas');
-const formularioFilas = document.getElementById('form-filas');
-const campoCajasPorFila = document.getElementById('filas-cajas');
-const campoFilas = document.getElementById('filas-cantidad');
-const cuentaDeFilas = document.getElementById('filas-cuenta');
-const botonSumarFilas = document.getElementById('btn-sumar-filas');
+const botonCargaCajas = document.getElementById('btn-carga-cajas');
+const botonCargaCantidad = document.getElementById('btn-carga-cantidad');
+const dialogoCantidad = document.getElementById('dialogo-cantidad');
+const formularioCantidad = document.getElementById('form-cantidad');
+const campoCajas = document.getElementById('cantidad-cajas');
+const campoCajasPorFila = document.getElementById('cantidad-por-fila');
+const campoFilas = document.getElementById('cantidad-filas');
+const cuentaDeCantidad = document.getElementById('cantidad-cuenta');
+const avisoEnVentana = document.getElementById('cantidad-aviso');
+const botonSumarCantidad = document.getElementById('btn-sumar-cantidad');
 const botonCamara = document.getElementById('btn-camara');
 const marcoCamara = document.getElementById('marco-camara');
 const botonLeer = document.getElementById('btn-leer');
@@ -131,39 +138,85 @@ function guardarPalletAbierto() {
   else localStorage.removeItem(CLAVE_PALLET_ABIERTO);
 }
 
-// Si se editó el producto con el pallet abierto, las cajas de antes y las de después van en
-// filas separadas: si no, cajas por unidades por caja no daría el total de la fila.
-// Dos lecturas con la misma clave van en la misma fila.
-const claveDeFila = ({ codigoInterno, descripcion, unidadesPorCaja }) => (
-  `${codigoInterno}|${descripcion}|${unidadesPorCaja}`);
+// Las lecturas de antes de que existiera la U.V no traen envase: eran contenedoras.
+const esUV = (lectura) => lectura.envase === 'uv';
 
-// Arma la guía para volver a controlar un pallet: "8 × 5" son 5 filas de 8 cajas, y "8 × 5 − 1"
-// dice que después se quitó una. Un conteo de la versión anterior no guardó las filas.
+// Arma la guía para volver a controlar las cajas cargadas a mano: "8 × 5" son 5 filas de 8
+// cajas, "40" es un total escrito de una vez, y "− 1" dice que después se quitó una. Las U.V
+// lo aclaran. Un conteo de una versión anterior no guardó las filas: queda como una fila.
 function detalleDeBloques(bloques) {
-  return [...bloques.values()].map(({ quedan, cajasPorFila = quedan, filas = 1 }) => {
-    const quitadas = cajasPorFila * filas - quedan;
-    return `${cajasPorFila} × ${filas}${quitadas > 0 ? ` − ${quitadas}` : ''}`;
+  return [...bloques.values()].map(({ quedan, cajasPorFila, filas, cantidad, uv }) => {
+    let [texto, total] = [`${quedan} × 1`, quedan];
+    if (cajasPorFila) [texto, total] = [`${cajasPorFila} × ${filas}`, cajasPorFila * filas];
+    else if (cantidad) [texto, total] = [String(cantidad), cantidad];
+    const quitadas = total - quedan;
+    return `${texto}${quitadas > 0 ? ` − ${quitadas}` : ''}${uv ? ' U.V' : ''}`;
   }).join(' + ');
 }
 
-// Convierte las lecturas, una por caja, en filas con sus totales de cajas y unidades.
-// detalleFilas dice cómo se contaron las cajas que no se escanearon.
+// Convierte las lecturas, una por caja, en una fila por producto: las contenedoras y las U.V del
+// mismo código interno van juntas, con cajas y unidades de cada envase. Si se editó el producto
+// con el pallet abierto y cambiaron las unidades de un envase, las cajas de después van en otra
+// fila: si no, cajas por unidades por caja no daría el total. indices dice qué lecturas son de
+// cada fila, y detalleFilas, cuáles se cargaron a mano.
 function agruparPorProducto(lecturas) {
-  const grupos = new Map();
-  for (const { bloque, cajasPorFila, filas, ...lectura } of lecturas) {
-    const clave = claveDeFila(lectura);
-    const grupo = grupos.get(clave) ?? { ...lectura, cajas: 0, unidades: 0, bloques: new Map() };
+  const grupos = [];
+  lecturas.forEach((lectura, indice) => {
+    const unidadesDelEnvase = esUV(lectura) ? 'unidadesUV' : 'unidadesCont';
+    let grupo = grupos.find((g) => g.codigoInterno === lectura.codigoInterno && g.descripcion === lectura.descripcion
+      && (g[unidadesDelEnvase] === null || g[unidadesDelEnvase] === lectura.unidadesPorCaja));
+    if (!grupo) {
+      grupo = {
+        codigoInterno: lectura.codigoInterno,
+        descripcion: lectura.descripcion,
+        cajas: 0,
+        cajasCont: 0,
+        cajasUV: 0,
+        unidadesCont: null,
+        unidadesUV: null,
+        unidades: 0,
+        maximoCont: 0,
+        maximoUV: 0,
+        indices: [],
+        bloques: new Map(),
+      };
+      grupos.push(grupo);
+    }
+    grupo[unidadesDelEnvase] = lectura.unidadesPorCaja;
     grupo.cajas += 1;
     grupo.unidades += lectura.unidadesPorCaja;
-    if (bloque) {
-      const datos = grupo.bloques.get(bloque) ?? { cajasPorFila, filas, quedan: 0 };
-      datos.quedan += 1;
-      grupo.bloques.set(bloque, datos);
+    grupo.indices.push(indice);
+    if (esUV(lectura)) {
+      grupo.cajasUV += 1;
+      grupo.maximoUV = lectura.cajasPorPallet ?? 0;
+    } else {
+      grupo.cajasCont += 1;
+      grupo.maximoCont = lectura.cajasPorPallet ?? 0;
     }
-    grupos.set(clave, grupo);
-  }
-  return [...grupos.values()].map(({ bloques, ...grupo }) => (
-    { ...grupo, detalleFilas: detalleDeBloques(bloques) }));
+    if (lectura.bloque) {
+      const { cajasPorFila, filas, cantidad } = lectura;
+      const datos = grupo.bloques.get(lectura.bloque) ?? { cajasPorFila, filas, cantidad, uv: esUV(lectura), quedan: 0 };
+      datos.quedan += 1;
+      grupo.bloques.set(lectura.bloque, datos);
+    }
+  });
+  return grupos.map(({ bloques, ...grupo }) => ({ ...grupo, detalleFilas: detalleDeBloques(bloques) }));
+}
+
+// Lo que se guarda de cada fila al cerrar el pallet: sin los datos que solo usa esta pantalla.
+const itemsParaGuardar = (items) => items.map(({ indices, maximoCont, maximoUV, ...item }) => item);
+
+// Dice si las cajas de un envase pasan las que entran en un pallet completo. Sin ese dato en
+// Productos no avisa. soloEnvase: mirar solo ese envase, el de la caja recién escaneada.
+// Devuelve el texto del aviso, o vacío.
+function avisoDeMaximo(item, soloEnvase = '') {
+  const pasadas = [
+    [item.cajasCont, item.maximoCont, 'contenedoras', 'contenedora'],
+    [item.cajasUV, item.maximoUV, 'cajas U.V', 'uv'],
+  ].find(([cantidad, maximo, , envase]) => maximo > 0 && cantidad > maximo && (!soloEnvase || soloEnvase === envase));
+  if (!pasadas) return '';
+  const [cantidad, maximo, nombre] = pasadas;
+  return `Son ${cantidad} ${nombre} y en un pallet completo entran ${maximo}.`;
 }
 
 // Suma las unidades de todas las filas.
@@ -183,6 +236,8 @@ const numeroParaCerrar = () => (numeroOcupado(pallet.numero) ? numeroLibre() : p
 function mostrarEstadoDelPallet() {
   if (pallet.devuelto) {
     mostrarEnTablero('error', 'Este pallet no se guardó', 'Cerralo de nuevo cuando esté resuelto.');
+  } else if (modoCantidad) {
+    mostrarEnTablero('espera', 'Escaneá una caja del producto', 'Después escribís cuántas cajas son.');
   } else {
     mostrarEnTablero('espera', pallet.lecturas.length ? 'Escaneá la siguiente caja' : 'Escaneá la primera caja');
   }
@@ -288,21 +343,30 @@ function noAbrirConEnter(evento) {
   senalError();
 }
 
-// Arma la fila de un producto en la lista, con su botón -1.
+// "3 cajas" si son todas contenedoras, o "3 Cont. y 2 U.V" si hay de las dos.
+function textoDeCajas(item) {
+  if (item.cajasUV === 0) return cajas(item.cajasCont);
+  if (item.cajasCont === 0) return `${item.cajasUV} U.V`;
+  return `${item.cajasCont} Cont. y ${item.cajasUV} U.V`;
+}
+
+// Arma la fila de un producto en la lista, con su botón -1, que saca su última caja.
 function filaItem(item) {
+  const pasado = avisoDeMaximo(item);
   return crear('li', { class: 'item' },
     crear('div', { class: 'fila-datos' },
       crear('strong', { class: 'codigo' }, item.codigoInterno),
       crear('span', {}, item.descripcion),
-      notaPorFilas(item)),
+      notaAMano(item),
+      pasado ? crear('span', { class: 'item-pasado' }, pasado) : ''),
     crear('button', {
       type: 'button',
       class: 'boton boton-secundario item-quitar',
-      'aria-label': `Quitar una caja de ${item.codigoInterno}`,
+      'aria-label': `Quitar la última caja de ${item.codigoInterno}`,
       alHacerClic: () => quitarUnaCaja(item),
     }, '−1'),
     crear('p', { class: 'item-cantidades' },
-      crear('span', {}, cajas(item.cajas)),
+      crear('span', {}, textoDeCajas(item)),
       crear('span', {}, unidades(item.unidades))));
 }
 
@@ -311,10 +375,7 @@ function filaItem(item) {
 function pintarPantalla() {
   vistaApertura.hidden = pallet !== null;
   vistaEscaneo.hidden = pallet === null;
-  if (!pallet) {
-    cancelarEsperaDeFilas();
-    return;
-  }
+  if (!pallet) return;
 
   const items = agruparPorProducto(pallet.lecturas);
   const totalCajas = pallet.lecturas.length;
@@ -394,22 +455,35 @@ function procesarCodigo(textoLeido) {
     return;
   }
 
-  // Guardamos una copia de los datos: si después se edita el producto, el pallet no cambia.
-  const { codigoInterno, codigoBarras, descripcion, unidadesPorCaja } = producto;
-  if (!codigoInterno || !unidadesPorCaja) {
-    rechazarLectura('No se sumó', `${codigoInterno || codigo}: faltan datos en Productos.`);
+  if (!producto.codigoInterno || !producto.unidadesPorCaja) {
+    rechazarLectura('No se sumó', `${producto.codigoInterno || codigo}: faltan datos en Productos.`);
     return;
   }
-  if (esperandoCajaDeFilas) {
-    abrirDialogoDeFilas(producto);
+  if (modoCantidad) {
+    abrirDialogoDeCantidad(producto);
     return;
   }
-  pallet.lecturas.push({ codigoInterno, codigoBarras, descripcion, unidadesPorCaja });
+  pallet.lecturas.push(lecturaDe(producto));
   guardarPalletAbierto();
   pintarPantalla();
-  mostrarEnTablero('ok', `${codigoInterno} sumada`, descripcion);
+  // La caja se sumó igual. Si con ella se pasa de un pallet completo, el aviso va en el tablero.
+  const item = agruparPorProducto(pallet.lecturas).find((i) => i.indices.includes(pallet.lecturas.length - 1));
+  const titulo = `${producto.codigoInterno}${producto.envase === 'uv' ? ' U.V' : ''} sumada`;
+  mostrarEnTablero('ok', titulo, avisoDeMaximo(item, esUV(producto) ? 'uv' : 'contenedora') || producto.descripcion);
   senalOk();
 }
+
+// Guardamos una copia de los datos del producto en cada caja: si después se edita el producto,
+// el pallet no cambia. extra: cómo se cargó a mano, si fue así.
+const lecturaDe = (producto, extra = {}) => ({
+  codigoInterno: producto.codigoInterno,
+  codigoBarras: producto.codigoBarras,
+  descripcion: producto.descripcion,
+  envase: producto.envase,
+  unidadesPorCaja: producto.unidadesPorCaja,
+  cajasPorPallet: producto.cajasPorPallet,
+  ...extra,
+});
 
 // Un doble toque sin querer no debe sacar dos cajas. Suena la alerta para que se note que
 // ese toque no quitó nada.
@@ -423,27 +497,27 @@ function esToqueRepetido() {
   return false;
 }
 
-// Saca la última caja leída, sea del producto que sea. Si fue un conteo por filas lo saca
-// entero, después de preguntar: un número mal escrito se corrige de una sola vez.
+// Saca la última caja leída, sea del producto que sea. Si fue una carga a mano la saca entera,
+// después de preguntar: un número mal escrito se corrige de una sola vez.
 async function deshacerUltimoEscaneo() {
   if (esToqueRepetido()) return;
   const lectura = pallet.lecturas.at(-1);
   if (!lectura) return;
   if (lectura.bloque) {
-    await deshacerConteoPorFilas(lectura);
+    await deshacerCargaAMano(lectura);
     return;
   }
   pallet.lecturas.pop();
   guardarPalletAbierto();
   pintarPantalla();
-  mostrarEnTablero('espera', 'Se deshizo una caja', lectura.codigoInterno);
+  mostrarEnTablero('espera', `Se deshizo una caja${esUV(lectura) ? ' U.V' : ''}`, lectura.codigoInterno);
 }
 
-// Saca todas las cajas que se sumaron juntas con Contar por filas.
-async function deshacerConteoPorFilas({ bloque, codigoInterno }) {
+// Saca todas las cajas que se cargaron juntas en la ventana de cantidad.
+async function deshacerCargaAMano({ bloque, codigoInterno }) {
   const cantidad = pallet.lecturas.filter((lectura) => lectura.bloque === bloque).length;
   const deshacer = await confirmar({
-    titulo: '¿Deshacer el conteo por filas?',
+    titulo: '¿Deshacer la carga a mano?',
     detalle: `Se saca todo junto: ${cajas(cantidad)} de ${codigoInterno}.`,
     si: 'Deshacer',
     no: 'Dejarlo',
@@ -453,17 +527,17 @@ async function deshacerConteoPorFilas({ bloque, codigoInterno }) {
   pallet.lecturas = pallet.lecturas.filter((lectura) => lectura.bloque !== bloque);
   guardarPalletAbierto();
   pintarPantalla();
-  mostrarEnTablero('espera', 'Se deshizo el conteo por filas', `${codigoInterno}: ${cajas(cantidad)}`);
+  mostrarEnTablero('espera', 'Se deshizo la carga a mano', `${codigoInterno}: ${cajas(cantidad)}`);
 }
 
-// Saca la última caja leída de una fila de la lista (botón -1).
+// Saca la última caja de una fila de la lista (botón -1), sea contenedora o U.V.
 function quitarUnaCaja(item) {
   if (esToqueRepetido()) return;
-  const clave = claveDeFila(item);
-  pallet.lecturas.splice(pallet.lecturas.findLastIndex((l) => claveDeFila(l) === clave), 1);
+  const lectura = pallet.lecturas[item.indices.at(-1)];
+  pallet.lecturas.splice(item.indices.at(-1), 1);
   guardarPalletAbierto();
   pintarPantalla();
-  mostrarEnTablero('espera', 'Se quitó una caja', item.codigoInterno);
+  mostrarEnTablero('espera', `Se quitó una caja${esUV(lectura) ? ' U.V' : ''}`, item.codigoInterno);
 }
 
 // Después de cerrar o descartar, la pantalla vuelve a "Abrir pallet".
@@ -517,6 +591,7 @@ async function cerrarPallet() {
     detalle: `${fechaParaMostrar(pallet.fecha)}. Responsable: ${pallet.responsable}.${cambioElNumero}`,
     contenido: crear('div', {},
       tablaDeItems(items),
+      ...items.filter(avisoDeMaximo).map((item) => crear('p', { class: 'mensaje-error' }, `${item.codigoInterno}: ${avisoDeMaximo(item)}`)),
       crear('p', { class: 'resumen-total' }, `Total: ${cajas(totalCajas)} y ${unidades(totalUnidades)}`)),
     si: 'Guardar y cerrar',
     no: 'Seguir escaneando',
@@ -534,7 +609,7 @@ async function cerrarPallet() {
     cerradoEn: new Date().toISOString(),
     totalCajas,
     totalUnidades,
-    items,
+    items: itemsParaGuardar(items),
   }).catch((error) => {
     // Si Firebase lo rechaza, las cajas vuelven a la pantalla en vez de perderse.
     guardarRechazados([...leerRechazados(), { ...palletCerrado, numero }]);
@@ -564,82 +639,130 @@ async function descartarPallet() {
   avisar('Pallet descartado');
 }
 
-// Las cajas del medio del pallet no se pueden escanear sin desarmarlo. Este botón pide una
-// lectura que no suma: solo dice de qué producto son, y después se escriben las cantidades.
-function alternarContarPorFilas() {
-  if (esperandoCajaDeFilas) {
-    cancelarEsperaDeFilas();
-    mostrarEstadoDelPallet();
-    return;
-  }
-  esperandoCajaDeFilas = true;
-  ultimaVezQueVioUnCodigo = performance.now();
-  botonFilas.textContent = 'Cancelar filas';
-  mostrarEnTablero('espera', 'Escaneá una caja del producto', 'No se suma: solo dice qué producto es.');
+// Muestra el modo de carga elegido.
+function pintarModoDeCarga() {
+  botonCargaCajas.setAttribute('aria-pressed', String(!modoCantidad));
+  botonCargaCantidad.setAttribute('aria-pressed', String(modoCantidad));
 }
 
-// Deja de esperar la caja que dice el producto. Si no estaba esperando, no cambia nada.
-function cancelarEsperaDeFilas() {
-  esperandoCajaDeFilas = false;
-  botonFilas.textContent = 'Contar por filas';
+// Cambia el modo de carga y lo deja guardado en el dispositivo.
+function elegirModoDeCarga(cantidad) {
+  modoCantidad = cantidad;
+  localStorage.setItem(CLAVE_MODO_CARGA, cantidad ? 'cantidad' : 'cajas');
+  pintarModoDeCarga();
+  if (pallet) mostrarEstadoDelPallet();
+  enfocarLector();
 }
 
-// Abre la ventana para escribir las cantidades de ese producto.
-function abrirDialogoDeFilas(producto) {
-  cancelarEsperaDeFilas();
-  productoDeFilas = producto;
-  document.getElementById('filas-producto').textContent = `${producto.codigoInterno}: ${producto.descripcion}`;
+// Abre la ventana para escribir cuántas cajas de ese producto se suman.
+function abrirDialogoDeCantidad(producto) {
+  productoDeCantidad = producto;
+  document.getElementById('cantidad-producto').textContent = `${producto.codigoInterno}: ${producto.descripcion}`;
+  document.getElementById('cantidad-envase').textContent =
+    `${NOMBRE_ENVASE[producto.envase]} de ${unidades(producto.unidadesPorCaja)}`;
+  campoCajas.value = '';
   campoCajasPorFila.value = '';
   campoFilas.value = '';
-  pintarCuentaDeFilas();
-  dialogoFilas.showModal();
-  campoCajasPorFila.focus();
+  pintarCuentaDeCantidad();
+  dialogoCantidad.showModal();
+  campoCajas.focus();
 }
 
 // Devuelve el número escrito en ese campo, o 0 si no es un entero mayor que cero.
 const enteroDelCampo = (campo) => (/^[1-9]\d*$/.test(campo.value) ? Number(campo.value) : 0);
 
-// Muestra la cuenta mientras se escribe. El tope frena una lectura de la pistola que cayó acá.
-function pintarCuentaDeFilas() {
+// Lo que se escribió en la ventana: el total, o las filas si se usaron.
+// Devuelve { total, cajasPorFila, filas }; sin filas, esos dos quedan en 0.
+function cantidadEscrita() {
+  const porFilas = campoCajasPorFila.value !== '' || campoFilas.value !== '';
+  if (!porFilas) return { total: enteroDelCampo(campoCajas), cajasPorFila: 0, filas: 0 };
   const cajasPorFila = enteroDelCampo(campoCajasPorFila);
   const filas = enteroDelCampo(campoFilas);
-  const total = cajasPorFila * filas;
-  const valida = total > 0 && total <= MAXIMO_CAJAS_POR_FILAS;
-  botonSumarFilas.disabled = !valida;
-  botonSumarFilas.textContent = valida ? `Sumar ${cajas(total)}` : 'Sumar';
+  return { total: cajasPorFila * filas, cajasPorFila, filas };
+}
+
+// Cuántas cajas de ese producto y envase tendría el pallet con las que se suman, y el aviso si
+// pasan las de un pallet completo. Devuelve el texto del aviso, o vacío.
+function avisoDeCantidad(producto, total) {
+  const maximo = producto.cajasPorPallet;
+  if (!maximo) return '';
+  const yaHay = pallet.lecturas.filter((l) => l.codigoInterno === producto.codigoInterno
+    && esUV(l) === (producto.envase === 'uv')).length;
+  if (yaHay + total <= maximo) return '';
+  const nombre = producto.envase === 'uv' ? 'cajas U.V' : 'contenedoras';
+  return `Con estas, el pallet tendría ${yaHay + total} ${nombre} de ${producto.codigoInterno}, y en un pallet completo entran ${maximo}.`;
+}
+
+// Muestra la cuenta mientras se escribe. El tope frena una lectura de la pistola que cayó acá.
+function pintarCuentaDeCantidad() {
+  const { total, cajasPorFila, filas } = cantidadEscrita();
+  const valida = total > 0 && total <= MAXIMO_CAJAS_A_MANO;
+  botonSumarCantidad.disabled = !valida;
+  botonSumarCantidad.textContent = valida ? `Sumar ${cajas(total)}` : 'Sumar';
+  const aviso = valida ? avisoDeCantidad(productoDeCantidad, total) : '';
+  avisoEnVentana.hidden = !aviso;
+  avisoEnVentana.textContent = aviso;
   if (valida) {
-    const totalDeUnidadesDeFilas = unidades(total * productoDeFilas.unidadesPorCaja);
-    cuentaDeFilas.textContent = `${cajasPorFila} × ${filas} = ${cajas(total)}, ${totalDeUnidadesDeFilas}`;
-  } else if (total > MAXIMO_CAJAS_POR_FILAS) {
-    cuentaDeFilas.textContent = `Son más de ${MAXIMO_CAJAS_POR_FILAS} cajas: revisá los números.`;
+    const filasEscritas = cajasPorFila ? `${cajasPorFila} × ${filas} = ` : '';
+    cuentaDeCantidad.textContent = `${filasEscritas}${cajas(total)}, ${unidades(total * productoDeCantidad.unidadesPorCaja)}`;
+  } else if (total > MAXIMO_CAJAS_A_MANO) {
+    cuentaDeCantidad.textContent = `Son más de ${MAXIMO_CAJAS_A_MANO} cajas: revisá los números.`;
   } else {
-    cuentaDeFilas.textContent = 'Escribí los dos números.';
+    cuentaDeCantidad.textContent = campoCajasPorFila.value || campoFilas.value
+      ? 'Escribí cajas por fila y filas.'
+      : 'Escribí cuántas cajas son.';
   }
 }
 
-// Suma las cajas de una vez. Con la cámara abierta va al resumen, para revisar la cuenta.
-function sumarPorFilas(evento) {
+// El total y las filas son dos maneras de decir lo mismo: al escribir en una se borra la otra.
+function alEscribirCantidad(evento) {
+  if (evento.target === campoCajas) {
+    campoCajasPorFila.value = '';
+    campoFilas.value = '';
+  } else {
+    campoCajas.value = '';
+  }
+  pintarCuentaDeCantidad();
+}
+
+// Antes de sumar pregunta "¿Confirmás 40 cajas = 24.000 unidades?". Corregir vuelve a la
+// ventana con lo escrito. Con la cámara abierta, al sumar va al resumen para revisar la cuenta.
+async function sumarCantidad(evento) {
   evento.preventDefault();
-  if (botonSumarFilas.disabled || !pallet) return;
-  const cajasPorFila = enteroDelCampo(campoCajasPorFila);
-  const filas = enteroDelCampo(campoFilas);
-  const total = cajasPorFila * filas;
-  const { codigoInterno, codigoBarras, descripcion, unidadesPorCaja } = productoDeFilas;
+  if (botonSumarCantidad.disabled || !pallet) return;
+  const producto = productoDeCantidad;
+  const { total, cajasPorFila, filas } = cantidadEscrita();
+  const totalDeUnidades = unidades(total * producto.unidadesPorCaja);
+  const aviso = avisoDeCantidad(producto, total);
+  dialogoCantidad.close();
+  const confirmada = await confirmar({
+    titulo: `¿Confirmás ${cajas(total)} = ${totalDeUnidades}?`,
+    detalle: `${producto.codigoInterno}: ${producto.descripcion}, ${NOMBRE_ENVASE[producto.envase]} de ${unidades(producto.unidadesPorCaja)}.${aviso ? ` ${aviso}` : ''}`,
+    si: 'Sí, sumar',
+    no: 'Corregir',
+  });
+  // pallet puede ser null: otra pestaña pudo haberlo cerrado con esta pregunta abierta.
+  if (!pallet) return;
+  if (!confirmada) {
+    productoDeCantidad = producto;
+    dialogoCantidad.showModal();
+    pintarCuentaDeCantidad();
+    return;
+  }
   // bloque identifica las cajas sumadas juntas, para poder deshacerlas de una vez.
   const bloque = Date.now();
-  for (let i = 0; i < total; i += 1) {
-    pallet.lecturas.push({ codigoInterno, codigoBarras, descripcion, unidadesPorCaja, bloque, cajasPorFila, filas });
-  }
-  dialogoFilas.close();
+  const comoSeCargo = cajasPorFila ? { bloque, cajasPorFila, filas } : { bloque, cantidad: total };
+  for (let i = 0; i < total; i += 1) pallet.lecturas.push(lecturaDe(producto, comoSeCargo));
   guardarPalletAbierto();
   pintarPantalla();
-  mostrarEnTablero('ok', `${cajas(total)} de ${codigoInterno}`, `Por filas: ${cajasPorFila} × ${filas}`);
+  const envase = producto.envase === 'uv' ? ' U.V' : '';
+  mostrarEnTablero('ok', `${cajas(total)}${envase} de ${producto.codigoInterno}`, aviso || totalDeUnidades);
   senalOk();
   if (camaraEncendida) cerrarLaCamaraYVerResumen().catch(console.error);
 }
 
 // Con la pistola, el Enter del final de una lectura no suma nada. Así, una lectura que caiga
-// en esta ventana no carga cajas: el primer campo pasa al siguiente y el último avisa.
+// en esta ventana no carga cajas: Cajas por fila pasa a Filas, y los demás avisan.
 function noSumarConEnter(evento) {
   if (evento.key !== 'Enter' || !evento.target.matches('input')) return;
   evento.preventDefault();
@@ -704,17 +827,18 @@ function pedirLectura() {
 
 // La cámara llama a esta función con cada código que ve. Con Tocar para leer solo cuenta si hay
 // una lectura pedida. En modo rápido cuenta sola, y la misma caja vuelve a contar a los 2
-// segundos aunque no haya salido de la vista: es lo que avisa el cartel de ese modo.
+// segundos aunque no haya salido de la vista: es lo que avisa el cartel de ese modo. En el modo
+// Código + cantidad lee sola, porque leer no suma: abre la ventana para escribir la cantidad.
 function alVerCodigoConLaCamara(codigo) {
   const ahora = performance.now();
   ultimaVezQueVioUnCodigo = ahora;
   cartelAcercarse.hidden = true;
   if (!visible || document.querySelector('dialog[open]')) return;
-  if (!modoRapido && temporizadorLeer === null && !esperandoCajaDeFilas) return;
+  if (!modoRapido && temporizadorLeer === null && !modoCantidad) return;
 
   const caja = buscarProducto(codigo)?.codigoInterno ?? codigo;
   const esperando = caja === ultimaCajaContada && ahora - momentoDeLaUltimaCaja < ESPERA_EN_MODO_RAPIDO_MS;
-  if ((modoRapido || esperandoCajaDeFilas) && esperando) return;
+  if ((modoRapido || modoCantidad) && esperando) return;
 
   ultimaCajaContada = caja;
   momentoDeLaUltimaCaja = ahora;
@@ -725,7 +849,7 @@ function alVerCodigoConLaCamara(codigo) {
 // La distancia no se puede medir: si la cámara está buscando un código y hace rato que no ve
 // ninguno, lo más probable es que esté lejos.
 function alNoVerCodigoConLaCamara() {
-  const buscandoCodigo = modoRapido || temporizadorLeer !== null || esperandoCajaDeFilas;
+  const buscandoCodigo = modoRapido || temporizadorLeer !== null || modoCantidad;
   const pasoElTiempo = performance.now() - ultimaVezQueVioUnCodigo >= ESPERA_PARA_PEDIR_QUE_SE_ACERQUE_MS;
   cartelAcercarse.hidden = !(buscandoCodigo && pasoElTiempo);
 }
@@ -782,9 +906,8 @@ async function encenderLaCamara() {
 // Apaga la cámara y deja el botón y el recuadro como al principio.
 async function apagarLaCamara() {
   camaraEncendida = false;
-  if ((temporizadorLeer !== null || esperandoCajaDeFilas) && pallet) mostrarEstadoDelPallet();
+  if (temporizadorLeer !== null && pallet) mostrarEstadoDelPallet();
   terminarLectura();
-  cancelarEsperaDeFilas();
   botonCamara.textContent = 'Usar cámara';
   marcoCamara.hidden = true;
   document.body.classList.remove('con-camara');
@@ -830,7 +953,7 @@ function alCambiarEnOtraPestana(evento) {
   pallet = JSON.parse(evento.newValue ?? 'null');
   // Una pregunta abierta se armó con el pallet de antes: contestarla ahora actuaría sobre otro.
   document.getElementById('dialogo-confirmar').close();
-  dialogoFilas.close();
+  dialogoCantidad.close();
   if (pallet) {
     escucharPalletsDe(pallet.fecha);
   } else {
@@ -879,13 +1002,16 @@ export function iniciarPantallaEscaneo() {
   });
 
   botonDeshacer.addEventListener('click', deshacerUltimoEscaneo);
-  botonFilas.addEventListener('click', alternarContarPorFilas);
-  formularioFilas.addEventListener('submit', sumarPorFilas);
-  formularioFilas.addEventListener('input', pintarCuentaDeFilas);
-  formularioFilas.addEventListener('keydown', noSumarConEnter);
-  document.getElementById('btn-cancelar-filas').addEventListener('click', () => dialogoFilas.close());
-  // En modo rápido, la caja que dijo el producto no tiene que contarse sola al cerrar la ventana.
-  dialogoFilas.addEventListener('close', () => {
+  botonCargaCajas.addEventListener('click', () => elegirModoDeCarga(false));
+  botonCargaCantidad.addEventListener('click', () => elegirModoDeCarga(true));
+  pintarModoDeCarga();
+  formularioCantidad.addEventListener('submit', sumarCantidad);
+  formularioCantidad.addEventListener('input', alEscribirCantidad);
+  formularioCantidad.addEventListener('keydown', noSumarConEnter);
+  document.getElementById('btn-cancelar-cantidad').addEventListener('click', () => dialogoCantidad.close());
+  // Con la cámara, la caja que dijo el producto no tiene que volver a abrir la ventana apenas
+  // se cierra, ni contarse sola si se cambia a modo rápido.
+  dialogoCantidad.addEventListener('close', () => {
     momentoDeLaUltimaCaja = performance.now();
   });
   botonCamara.addEventListener('click', () => (camaraEncendida ? cerrarLaCamaraYVerResumen() : encenderLaCamara()));

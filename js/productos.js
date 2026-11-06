@@ -4,8 +4,10 @@ import { productosDePrueba } from './datos-prueba.js';
 import { apagarCamara, encenderCamara, mensajeDeCamara, motivoSinCamara } from './lector.js';
 import { esSupervisor } from './sesion.js';
 import {
+  NOMBRE_ENVASE,
   avisar,
   avisarErrorDeDatos,
+  cajas,
   confirmar,
   crear,
   motivoDelError,
@@ -14,11 +16,10 @@ import {
   unidades,
 } from './ui.js';
 
+// Cada fila de la tabla es un código de barras, y cada código es un envase del producto (ver
+// NOMBRE_ENVASE). Los topes frenan una lectura de la pistola que cayó en el campo equivocado.
 const UNIDADES_POR_CAJA_MAXIMAS = 100000;
-
-// Cada fila de la tabla es un código de barras, y cada código es un envase del producto: la caja
-// contenedora o la unidad de venta (U.V), que es la cajita o bolsa de adentro.
-const NOMBRE_ENVASE = { contenedora: 'Contenedora', uv: 'U.V' };
+const CAJAS_POR_PALLET_MAXIMAS = 9999;
 
 let productos = [];
 let cargados = false;
@@ -41,7 +42,8 @@ const campoBarras = document.getElementById('campo-barras');
 const campoInterno = document.getElementById('campo-interno');
 const campoDescripcion = document.getElementById('campo-descripcion');
 const campoUnidades = document.getElementById('campo-unidades');
-const camposEnOrden = [campoBarras, campoInterno, campoDescripcion, campoUnidades];
+const campoCajasPorPallet = document.getElementById('campo-cajas-por-pallet');
+const camposEnOrden = [campoBarras, campoInterno, campoDescripcion, campoUnidades, campoCajasPorPallet];
 const mensajeFormulario = document.getElementById('mensaje-formulario');
 const botonLeerBarras = document.getElementById('btn-leer-barras');
 const marcoLeerBarras = document.getElementById('marco-leer-barras');
@@ -58,11 +60,11 @@ export function normalizarCodigo(texto) {
 }
 
 // Number() sola aceptaría -5, 2,5 o "Infinity", y "1.200" lo leería como 1,2.
-// Devuelve el número, o 0 si no sirve.
-function unidadesValidas(valor) {
+// Devuelve el entero, o 0 si no sirve o pasa el máximo.
+function enteroValido(valor, maximo) {
   const texto = String(valor ?? '').trim();
   const numero = /^\d+$/.test(texto) ? Number(texto) : 0;
-  return numero <= UNIDADES_POR_CAJA_MAXIMAS ? numero : 0;
+  return numero <= maximo ? numero : 0;
 }
 
 // En la base va 'contenedora' o 'uv'. Uno cargado a mano en la consola puede decir "U.V" o "UV",
@@ -83,7 +85,9 @@ const productoCompleto = (producto) => ({
   codigoInterno: String(producto.codigoInterno ?? ''),
   descripcion: String(producto.descripcion ?? ''),
   envase: envaseValido(producto.envase),
-  unidadesPorCaja: unidadesValidas(producto.unidadesPorCaja),
+  unidadesPorCaja: enteroValido(producto.unidadesPorCaja, UNIDADES_POR_CAJA_MAXIMAS),
+  // Cuántas cajas de este envase llenan un pallet. 0 si no se sabe: entonces no avisa nada.
+  cajasPorPallet: enteroValido(producto.cajasPorPallet, CAJAS_POR_PALLET_MAXIMAS),
 });
 
 // Algunas pistolas agregan o sacan ceros adelante de un código numérico (0779... y 779...).
@@ -139,6 +143,7 @@ function abrirFormulario(producto) {
   campoDescripcion.value = producto.descripcion ?? '';
   formulario.elements.envase.value = producto.envase ?? envaseSegunCodigo(campoBarras.value);
   campoUnidades.value = producto.unidadesPorCaja ?? '';
+  campoCajasPorPallet.value = producto.cajasPorPallet || '';
   mensajeFormulario.hidden = true;
   // Desde Escanear el código ya vino leído, y la cámara de esa pantalla puede seguir prendida.
   botonLeerBarras.hidden = Boolean(alGuardarFormulario);
@@ -273,6 +278,9 @@ function guardarFormulario(evento) {
     envase: formulario.elements.envase.value,
     unidadesPorCaja: Number(campoUnidades.value),
   };
+  // Es optativo: si queda vacío no se guarda, y al cargar un pallet no se avisa si se pasa.
+  const cajasPorPallet = Number(campoCajasPorPallet.value);
+  if (cajasPorPallet > 0) datos.cajasPorPallet = cajasPorPallet;
 
   // required acepta un campo con solo espacios, y recién acá quedan vacíos.
   if (!datos.codigoInterno || !datos.descripcion) {
@@ -310,6 +318,7 @@ function filaProducto(producto) {
       crear('strong', { class: 'codigo' }, producto.codigoInterno),
       crear('span', {}, producto.descripcion),
       crear('span', { class: 'dato-envase' }, `${NOMBRE_ENVASE[producto.envase]} de ${unidades(producto.unidadesPorCaja)}`),
+      producto.cajasPorPallet ? crear('span', {}, `Pallet completo: ${cajas(producto.cajasPorPallet)}`) : '',
       crear('span', { class: 'dato-suave' },
         producto.codigoBarras ? `Código de barras ${producto.codigoBarras}` : 'Sin código de barras')),
     esSupervisor() ? crear('div', { class: 'fila-botones' },

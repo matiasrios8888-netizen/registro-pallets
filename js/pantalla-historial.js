@@ -5,6 +5,7 @@ import {
   avisar,
   avisarErrorDeDatos,
   cajas,
+  cajasDelItem,
   confirmar,
   crear,
   fechaDeHoy,
@@ -88,9 +89,13 @@ function tarjetaPallet(pallet, repetido) {
 function totalesPorProducto() {
   const porCodigo = new Map();
   for (const item of pallets.flatMap((pallet) => pallet.items)) {
-    const total = porCodigo.get(item.codigoInterno)
-      ?? { codigoInterno: item.codigoInterno, descripcion: item.descripcion, cajas: 0, unidades: 0 };
+    const total = porCodigo.get(item.codigoInterno) ?? {
+      codigoInterno: item.codigoInterno, descripcion: item.descripcion, cajas: 0, cajasCont: 0, cajasUV: 0, unidades: 0,
+    };
+    const { cont, uv } = cajasDelItem(item);
     total.cajas += item.cajas;
+    total.cajasCont += cont;
+    total.cajasUV += uv;
     total.unidades += item.unidades;
     porCodigo.set(item.codigoInterno, total);
   }
@@ -115,17 +120,23 @@ function pintar() {
 }
 
 // Una fila por cada producto de cada pallet: es lo más cómodo para filtrar en Excel.
+// "Cargadas a mano" dice cómo se contaron las cajas que no se escanearon una por una: "8 × 5"
+// son 5 filas de 8, y "40" un total escrito de una vez.
 function armarFilas() {
-  return pallets.flatMap((pallet) => pallet.items.map((item) => ({
-    Fecha: fechaParaMostrar(pallet.fecha),
-    Pallet: pallet.numero,
-    Responsable: pallet.responsable,
-    Código: item.codigoInterno,
-    Descripción: item.descripcion,
-    Cajas: item.cajas,
-    Unidades: item.unidades,
-    'Cajas por fila × filas': item.detalleFilas ?? '',
-  })));
+  return pallets.flatMap((pallet) => pallet.items.map((item) => {
+    const { cont, uv } = cajasDelItem(item);
+    return {
+      Fecha: fechaParaMostrar(pallet.fecha),
+      Pallet: pallet.numero,
+      Responsable: pallet.responsable,
+      Código: item.codigoInterno,
+      Descripción: item.descripcion,
+      'Caja Cont.': cont,
+      'Caja U.V': uv,
+      Unidades: item.unidades,
+      'Cargadas a mano': item.detalleFilas ?? '',
+    };
+  }));
 }
 
 // Segunda hoja del Excel: el total del día de cada producto, como la tabla de la pantalla.
@@ -134,12 +145,13 @@ function hojaPorProducto() {
     Fecha: fechaParaMostrar(campoFecha.value),
     Código: total.codigoInterno,
     Descripción: total.descripcion,
-    Cajas: total.cajas,
+    'Caja Cont.': total.cajasCont,
+    'Caja U.V': total.cajasUV,
     Unidades: total.unidades,
   }));
   const hoja = XLSX.utils.json_to_sheet(filas);
   const anchoDescripcion = Math.max(40, ...filas.map((fila) => fila.Descripción.length));
-  hoja['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: anchoDescripcion }, { wch: 8 }, { wch: 10 }];
+  hoja['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: anchoDescripcion }, { wch: 10 }, { wch: 9 }, { wch: 10 }];
   return hoja;
 }
 
@@ -164,7 +176,7 @@ function exportarExcel() {
   // La columna se ajusta a la descripción más larga: la celda de al lado la cortaría.
   const anchoDescripcion = Math.max(40, ...filas.map((fila) => fila.Descripción.length));
   hoja['!cols'] = [
-    { wch: 12 }, { wch: 8 }, { wch: 22 }, { wch: 12 }, { wch: anchoDescripcion }, { wch: 8 }, { wch: 10 }, { wch: 22 },
+    { wch: 12 }, { wch: 8 }, { wch: 22 }, { wch: 12 }, { wch: anchoDescripcion }, { wch: 10 }, { wch: 9 }, { wch: 10 }, { wch: 22 },
   ];
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, 'Pallets');

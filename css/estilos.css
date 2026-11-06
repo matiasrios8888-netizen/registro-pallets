@@ -516,18 +516,62 @@ a.boton {
   scroll-margin-top: 12px;
 }
 
-.nota-por-filas {
+.nota-a-mano {
   display: block;
   color: var(--tinta-suave);
   font-size: 18px;
   font-weight: 700;
 }
 
-#filas-producto {
+/* Las cajas de un producto pasan las que entran en un pallet completo. */
+.item-pasado {
+  color: var(--paro);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* Caja por caja o Código + cantidad: dos opciones grandes, la elegida resaltada. */
+.modo-carga {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.modo-carga button {
+  min-height: 64px;
+  padding: 6px 8px;
+  border: 3px solid var(--gabinete);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--tinta);
+  font-family: var(--letra-angosta);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.modo-carga [aria-pressed='true'] {
+  border-color: var(--tablero);
+  background: var(--tablero);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Ventana Cargar cantidad */
+#cantidad-producto,
+#cantidad-envase {
   margin-block: 0;
 }
 
-#filas-cuenta {
+.dialogo .ayuda-cantidad {
+  margin-block: 4px 0;
+  color: var(--tinta-suave);
+  font-size: 18px;
+}
+
+#cantidad-cuenta {
   min-height: 2.3em;
   margin-block: 0 14px;
   font-size: 26px;
@@ -550,8 +594,8 @@ a.boton {
     inset: 0;
     z-index: 3;
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
     padding: 8px;
     background: var(--tablero);
@@ -572,7 +616,6 @@ a.boton {
   }
 
   .con-camara #btn-deshacer,
-  .con-camara #btn-filas,
   .con-camara #btn-camara {
     min-height: 64px;
     padding-inline: 6px;
@@ -584,14 +627,31 @@ a.boton {
     grid-column: 1;
   }
 
-  .con-camara #btn-filas {
+  .con-camara .dos-botones {
     grid-row: 3;
     grid-column: 2;
   }
 
-  .con-camara .dos-botones {
-    grid-row: 3;
-    grid-column: 3;
+  /* Sobre el fondo oscuro, el modo de carga va como el de la cámara: la elegida en naranja. */
+  .con-camara .modo-carga {
+    grid-row: 4;
+    grid-column: 1 / -1;
+    gap: 0;
+  }
+
+  .con-camara .modo-carga button {
+    min-height: 52px;
+    border: 0;
+    border-bottom: 5px solid transparent;
+    border-radius: 0;
+    background: none;
+    color: #fff;
+    font-size: 20px;
+  }
+
+  .con-camara .modo-carga [aria-pressed='true'] {
+    border-bottom-color: var(--led);
+    color: var(--led);
   }
 
   .con-camara .fuera-de-camara {
@@ -681,6 +741,19 @@ a.boton {
   }
 }
 
+/* En un celular bajo, los botones de abajo se achican para que el video no quede chico. */
+@media (max-width: 899px) and (max-height: 600px) {
+  .con-camara #btn-deshacer,
+  .con-camara #btn-camara {
+    min-height: 56px;
+  }
+
+  .con-camara .modo-carga button {
+    min-height: 44px;
+    font-size: 18px;
+  }
+}
+
 @media (min-height: 760px) and (max-width: 899px) {
   .con-camara .ayuda-camara {
     display: block;
@@ -713,12 +786,12 @@ a.boton {
     grid-column: 2;
   }
 
-  .con-camara #btn-filas {
+  .con-camara .dos-botones {
     grid-row: 2;
     grid-column: 3;
   }
 
-  .con-camara .dos-botones {
+  .con-camara .modo-carga {
     grid-row: 3;
     grid-column: 2 / -1;
   }
@@ -1026,6 +1099,11 @@ select {
   .tabla-items tr {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 60px minmax(116px, max-content);
+  }
+
+  /* Con U.V hay una columna de cajas más. */
+  .tabla-items.con-uv tr {
+    grid-template-columns: minmax(0, 1fr) 54px 54px minmax(100px, max-content);
   }
 
   .tabla-items th:nth-child(2) {

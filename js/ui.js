@@ -35,27 +35,41 @@ export function fechaDeHoy() {
 // De "2026-11-01" a "01/11/2026".
 export const fechaParaMostrar = (fecha) => fecha.split('-').reverse().join('/');
 
-// Aclara cómo se contaron las cajas que no se escanearon. Vacío si se escanearon todas.
-export function notaPorFilas(item) {
-  const texto = item.detalleFilas ? `Por filas: ${item.detalleFilas}` : '';
-  return crear('span', { class: 'nota-por-filas' }, texto);
+// Cada código de barras es un envase del producto: la caja contenedora o la unidad de venta
+// (U.V), que es la cajita o la bolsa de adentro.
+export const NOMBRE_ENVASE = { contenedora: 'Contenedora', uv: 'U.V' };
+
+// Las cajas de cada envase de una fila. Un pallet cerrado antes de que existiera la U.V solo
+// guardó "cajas", y eran todas contenedoras.
+export const cajasDelItem = (item) => ({ cont: item.cajasCont ?? item.cajas ?? 0, uv: item.cajasUV ?? 0 });
+
+// Aclara qué cajas se cargaron a mano, sin escanear cada una. Vacío si se escanearon todas.
+export function notaAMano(item) {
+  const texto = item.detalleFilas ? `A mano: ${item.detalleFilas}` : '';
+  return crear('span', { class: 'nota-a-mano' }, texto);
 }
 
-// Tabla de productos de un pallet. Se usa en el resumen final y en el historial.
+// Tabla de productos de un pallet. Se usa en el resumen final y en el historial. Si alguna fila
+// tiene cajas U.V, las cajas van en dos columnas: Caja Cont. y Caja U.V.
 export function tablaDeItems(items) {
-  return crear('table', { class: 'tabla-items' },
+  const conUV = items.some((item) => cajasDelItem(item).uv > 0);
+  return crear('table', { class: conUV ? 'tabla-items con-uv' : 'tabla-items' },
     crear('thead', {},
       crear('tr', {},
         crear('th', { scope: 'col' }, 'Código'),
         crear('th', { scope: 'col' }, 'Descripción'),
-        crear('th', { scope: 'col', class: 'numero' }, 'Cajas'),
+        crear('th', { scope: 'col', class: 'numero' }, conUV ? 'Cont.' : 'Cajas'),
+        conUV ? crear('th', { scope: 'col', class: 'numero' }, 'U.V') : '',
         crear('th', { scope: 'col', class: 'numero' }, 'Unidades'))),
-    crear('tbody', {}, ...items.map((item) => (
-      crear('tr', {},
+    crear('tbody', {}, ...items.map((item) => {
+      const { cont, uv } = cajasDelItem(item);
+      return crear('tr', {},
         crear('td', { class: 'codigo' }, item.codigoInterno),
-        crear('td', {}, item.descripcion, notaPorFilas(item)),
-        crear('td', { class: 'numero' }, formatearNumero(item.cajas)),
-        crear('td', { class: 'numero' }, formatearNumero(item.unidades)))))));
+        crear('td', {}, item.descripcion, notaAMano(item)),
+        crear('td', { class: 'numero' }, formatearNumero(cont)),
+        conUV ? crear('td', { class: 'numero' }, formatearNumero(uv)) : '',
+        crear('td', { class: 'numero' }, formatearNumero(item.unidades)));
+    })));
 }
 
 // Sonidos: en planta hay ruido, por eso además vibra (en celular) y cambia el color.

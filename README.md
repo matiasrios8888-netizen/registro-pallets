@@ -20,7 +20,7 @@ La pistola Bluetooth se vincula desde el Bluetooth del celular, como si fuera un
 
 ```text
 Registro De Palets/
-├── index.html              Las tres pantallas y las ventanas de pregunta
+├── index.html              Las cuatro pantallas y las ventanas de pregunta
 ├── codigos-prueba.html     Hoja con códigos de barras para probar
 ├── css/
 │   └── estilos.css         El diseño. Los colores están todos arriba de todo
@@ -31,12 +31,14 @@ Registro De Palets/
 │   ├── lector.js           Lee los códigos: la pistola y la cámara
 │   ├── pantalla-escaneo.js Abre el pallet, suma cajas, deshace y cierra
 │   ├── pantalla-historial.js  Pallets de un día, su detalle y el Excel
+│   ├── pantalla-ordenes.js Órdenes de producción abiertas e importar la COOIS
+│   ├── coois.js            Lee el Excel de la COOIS y lo pasa a órdenes
 │   ├── productos.js        Busca productos por código y maneja esa pantalla
 │   ├── sesion.js           Entrar y salir, y qué puede hacer cada usuario
 │   ├── datos.js            Elige dónde guardar: Firebase o este navegador
 │   ├── datos-firebase.js   Guarda en Firestore
 │   ├── datos-local.js      Guarda en el navegador (modo prueba)
-│   ├── datos-prueba.js     Los productos inventados: 4, con 2 códigos cada uno
+│   ├── datos-prueba.js     Productos inventados (4, con 2 códigos cada uno) y una COOIS inventada
 │   ├── config.js           Los datos de conexión a Firebase
 │   └── ui.js               Herramientas comunes: sonidos, avisos y preguntas
 ├── android/                El proyecto de Android que genera el APK
@@ -68,6 +70,8 @@ python -m http.server 5500
 **4.** En **Productos**, tocá **Ver códigos de prueba**. Imprimí la hoja o mostrala en otra pantalla. Cada producto trae dos códigos: el de la caja contenedora y el de la unidad de venta (U.V).
 
 **5.** Volvé a **Escanear**. Cuando diga **Lector listo** en verde, disparale con la pistola a un código. También podés escribir `KD0324` con el teclado y apretar Enter, que es lo mismo que hace la pistola.
+
+**6.** En **Órdenes**, tocá **Bajar COOIS de prueba**: baja un Excel con 10 órdenes inventadas. Después tocá **Importar COOIS** y elegí ese archivo.
 
 Para cortar el servidor, apretá `Ctrl + C` en la terminal.
 
@@ -149,9 +153,10 @@ La cámara del navegador solo funciona si la página se abre por `https`: desde 
 
 - **Usuarios:** con Firebase, cada persona entra una sola vez en cada dispositivo, con su usuario y su contraseña. Para entrar hace falta internet. El nombre de quien entró se completa solo como responsable, y se puede cambiar. **Salir** está al final de Productos.
 - **Supervisor:** solo el supervisor ve los botones para cargar, cambiar y borrar productos, y el de borrar pallets. Si otro escanea un código desconocido, la app le dice que se lo pida al supervisor. La base también lo controla, aunque alguien saltee los botones. En modo prueba no hay usuarios y se puede todo.
+- **Órdenes (COOIS):** el supervisor importa cada día la COOIS, el Excel que exporta SAP con las órdenes de producción. **Importar COOIS** abre una ventana para elegir qué columna del archivo es cada dato: número de orden, código interno, descripción, cantidades y fecha. La app deja elegidas las que reconoce por el nombre y recuerda la elección para la próxima vez. Para saber cuánto le falta a cada orden alcanza con la cantidad pendiente, o con la cantidad de la orden y la entregada. Antes de importar muestra cuántas órdenes entran y cuáles quedan afuera: las ya completas, las filas sin número o sin código, y las órdenes repetidas. También avisa los códigos que no están en Productos. Cada COOIS reemplaza a la anterior. Todos ven las órdenes de cada producto, de la más vieja a la más nueva. En **Buscar** se puede escribir una orden o un código, o escanear una caja.
 - **Total por producto:** Historial suma todos los pallets del día por producto, que es lo que se descuenta de las órdenes. El Excel trae la misma tabla en una segunda hoja, **Por producto**. La primera hoja, **Pallets**, sigue con una fila por producto de cada pallet.
 - **Foco:** el campo de la pistola recupera el cursor solo. Si la etiqueta dice en rojo "Tocá acá para volver a leer", la app no es la ventana activa y la pistola estaría escribiendo en otro programa.
-- **Lecturas fuera de lugar:** en Historial, en Productos o antes de abrir el pallet, una lectura no suma nada. Suena la alerta y un aviso dice que no se contó.
+- **Lecturas fuera de lugar:** en Historial, en Órdenes, en Productos o antes de abrir el pallet, una lectura no suma nada. Suena la alerta y un aviso dice que no se contó.
 - **Teclado del celular:** ese campo no abre el teclado de pantalla, para que no tape el tablero. Para escribir un código, tocá **Escribir a mano**.
 - **Abrir pallet:** solo se abre tocando el botón, nunca con Enter. El número va de 1 a 9999 y la fecha puede estar hasta 31 días antes o después de hoy. El responsable no acepta 4 cifras seguidas ni un código de producto. Esos controles frenan una lectura que cayó en el campo equivocado.
 - **Productos y envases:** en Productos hay una fila por código de barras. Cada producto puede tener dos: el de la caja contenedora y el de la unidad de venta (U.V), que es la cajita o la bolsa de adentro. Las dos filas comparten el código interno y cada una dice cuántas unidades trae su envase. Un producto no puede tener dos contenedoras ni dos U.V. Si se escribe el código interno en vez de escanear, cuenta la contenedora. Los productos cargados antes de esto son contenedoras.

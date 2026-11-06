@@ -5,6 +5,8 @@ rules_version = '2';
 // - Productos: los ve cualquiera que haya entrado. Solo el supervisor los carga, cambia o borra.
 // - Pallets: cualquiera que haya entrado los cierra, a su nombre. Solo el supervisor los borra.
 //   Un pallet cerrado no se edita.
+// - Órdenes de producción (de la COOIS): las ve cualquiera que haya entrado. Solo el supervisor
+//   las importa. "coois" guarda los datos de la última importación.
 // - Usuarios: cada uno ve y escribe su nombre, pero no su rol. El rol se pone a mano en la
 //   consola de Firebase, y la consola no pasa por estas reglas.
 service cloud.firestore {
@@ -33,6 +35,16 @@ service cloud.firestore {
       allow read: if conSesion();
       allow create: if conSesion() && request.resource.data.creadoPor == request.auth.uid;
       allow delete: if esSupervisor();
+    }
+
+    match /ordenes/{id} {
+      allow read: if conSesion();
+      allow create, update, delete: if esSupervisor();
+    }
+
+    match /coois/{id} {
+      allow read: if conSesion();
+      allow create, update, delete: if esSupervisor();
     }
 
     match /usuarios/{uid} {

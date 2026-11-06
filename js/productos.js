@@ -29,6 +29,8 @@ let alGuardarFormulario = null;
 // La cámara del formulario está prendida, o arrancando, mientras esto valga true.
 let leyendo = false;
 let anchoDeLaLectura = 0;
+// Se pidió la cámara mientras terminaba de arrancar una que ya se había cancelado.
+let volverAEncender = false;
 
 const lista = document.getElementById('lista-productos');
 const buscador = document.getElementById('buscar-producto');
@@ -205,8 +207,12 @@ function completarDescripcion() {
 
 // Prende la cámara adentro del formulario. Si no puede, se sigue cargando a mano.
 async function encenderLectura() {
-  // Todavía está arrancando la anterior.
-  if (botonLeerBarras.disabled) return;
+  // Todavía está arrancando la anterior. Si esa ya se canceló, porque se cerró el formulario y se
+  // volvió a abrir enseguida, se vuelve a encender apenas termine de arrancar y se apague.
+  if (botonLeerBarras.disabled) {
+    if (!leyendo) volverAEncender = true;
+    return;
+  }
   const motivo = motivoSinCamara();
   if (motivo) {
     mostrarErrorDeFormulario(motivo);
@@ -231,7 +237,13 @@ async function encenderLectura() {
   }
   botonLeerBarras.disabled = false;
   // Si mientras arrancaba se cerró el formulario, nadie más la apaga.
-  if (!leyendo) apagarCamara().catch(console.error);
+  if (!leyendo) {
+    await apagarCamara().catch(console.error);
+    if (volverAEncender) {
+      volverAEncender = false;
+      encenderLectura();
+    }
+  }
 }
 
 // html5-qrcode fija el ancho del video al encender. Si se gira el celular hay que reiniciarla:
@@ -396,6 +408,7 @@ export function iniciarProductos() {
   // Sale por cualquier lado (Guardar, Cancelar, tecla Atrás): la cámara no puede quedar prendida.
   // Sin leyendo apagaría la de la pantalla Escanear, que sigue abierta atrás del formulario.
   dialogo.addEventListener('close', () => {
+    volverAEncender = false;
     if (leyendo) apagarLectura();
   });
   window.addEventListener('resize', reiniciarLecturaSiCambioElAncho);

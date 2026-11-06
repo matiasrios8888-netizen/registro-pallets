@@ -6,6 +6,8 @@ import { productosDePrueba } from './datos-prueba.js';
 // otro. Es lo mismo, porque este archivo solo existe en modo prueba.
 const CLAVE_PRODUCTOS = 'registro-pallets.prueba.productos';
 const CLAVE_PALLETS = 'registro-pallets.prueba.pallets';
+const CLAVE_ORDENES = 'registro-pallets.prueba.ordenes';
+const CLAVE_IMPORTACION = 'registro-pallets.prueba.importacion-coois';
 
 // Funciones que hay que volver a llamar cuando cambian los datos.
 const oyentes = new Set();
@@ -76,4 +78,20 @@ export async function guardarPallet(pallet) {
 // Borra un pallet cerrado.
 export async function borrarPallet(id) {
   escribir(CLAVE_PALLETS, leer(CLAVE_PALLETS).filter((p) => p.id !== id));
+}
+
+// Igual que en Firebase: { ordenes, importacion } de la última COOIS importada.
+// En modo prueba arranca vacía, para probar la importación.
+export function escucharCoois(alCambiar) {
+  return escuchar(() => ({
+    ordenes: leer(CLAVE_ORDENES),
+    importacion: JSON.parse(localStorage.getItem(CLAVE_IMPORTACION) ?? 'null'),
+  }), alCambiar);
+}
+
+// Las órdenes nuevas reemplazan a todas las anteriores. idsAnteriores no hace falta acá: está
+// para tener las mismas funciones que Firebase.
+export async function reemplazarOrdenes(idsAnteriores, ordenes, importacion) {
+  localStorage.setItem(CLAVE_IMPORTACION, JSON.stringify(importacion));
+  escribir(CLAVE_ORDENES, ordenes.map((orden) => ({ ...orden, id: String(orden.numero) })));
 }

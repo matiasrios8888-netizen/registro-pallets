@@ -788,7 +788,8 @@ a.boton {
 }
 
 /* Campos de formulario */
-input {
+input,
+select {
   width: 100%;
   min-height: 68px;
   padding: 10px 14px;
@@ -806,7 +807,8 @@ input {
   font-weight: 600;
 }
 
-.campo input {
+.campo input,
+.campo select {
   margin-top: 6px;
   font-weight: 500;
 }
@@ -963,7 +965,8 @@ input {
   padding: 18px 14px;
 }
 
-#pantalla-productos > .boton + .boton {
+#pantalla-productos > .boton + .boton,
+#pantalla-ordenes > .boton + .boton {
   margin-top: 12px;
 }
 
@@ -1143,24 +1146,113 @@ input {
   margin-bottom: 14px;
 }
 
+/* Pantalla Órdenes: una tarjeta por producto con sus órdenes abiertas */
+.resumen-coois {
+  margin-block: 0 14px;
+  font-size: 20px;
+}
+
+.ayuda-coois,
+.dialogo .ayuda-coois {
+  margin-block: 0 14px;
+  color: var(--tinta-suave);
+  font-size: 18px;
+}
+
+.lista-ordenes {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.orden-producto {
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--chapa);
+}
+
+.orden-producto p {
+  margin: 2px 0;
+}
+
+.falta-producto {
+  color: var(--paro);
+  font-weight: 700;
+}
+
+.tabla-ordenes {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+}
+
+.tabla-ordenes th {
+  padding: 0 8px 6px 0;
+  color: var(--tinta-suave);
+  font-size: 18px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.tabla-ordenes td {
+  padding: 8px 8px 8px 0;
+  border-top: 2px solid var(--gabinete);
+  font-size: 20px;
+  vertical-align: top;
+}
+
+.tabla-ordenes td.codigo {
+  font-size: 24px;
+}
+
+.tabla-ordenes .numero {
+  padding-right: 0;
+  text-align: right;
+}
+
+.tabla-ordenes td.numero {
+  font-family: var(--letra-angosta);
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* "de 6.000": la cantidad total de la orden, debajo de lo que falta. */
+.tabla-ordenes .de-cantidad {
+  display: block;
+  font-family: var(--letra);
+  font-weight: 400;
+}
+
+.coois-resultado {
+  margin-bottom: 16px;
+}
+
+.dialogo .nota-coois {
+  margin-block: 0 8px;
+  font-size: 18px;
+}
+
 /* Navegación: fija abajo, a mano del pulgar */
 .navegacion {
   position: sticky;
   bottom: 0;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   background: var(--tablero);
 }
 
+/* Con cuatro pantallas, en un celular angosto la letra se achica para que entre "Productos". */
 .navegacion button {
   min-height: 76px;
+  padding-inline: 2px;
   border: 0;
   border-top: 6px solid transparent;
   background: none;
   color: #fff;
   font-family: var(--letra-angosta);
-  font-size: 26px;
+  font-size: clamp(18px, 5.6vw, 26px);
   font-weight: 600;
   cursor: pointer;
   touch-action: manipulation;
@@ -1264,7 +1356,19 @@ input {
   #btn-exportar,
   #pantalla-productos > .boton,
   #pantalla-historial > .campo,
-  #pantalla-productos > .campo {
+  #pantalla-productos > .campo,
+  #pantalla-ordenes > .boton,
+  #pantalla-ordenes > .campo {
     max-width: 420px;
+  }
+
+  .lista-ordenes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  /* La ayuda ocupa el ancho de las dos columnas. */
+  .lista-ordenes > .ayuda-coois {
+    grid-column: 1 / -1;
   }
 }

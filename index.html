@@ -154,7 +154,20 @@
       <div id="lista-pallets" class="lista-pallets"></div>
     </section>
 
-    <!-- Pantalla 3: tabla de productos -->
+    <!-- Pantalla 3: órdenes de producción abiertas, que vienen de la COOIS de SAP -->
+    <section id="pantalla-ordenes" class="pantalla" hidden>
+      <h1>Órdenes</h1>
+      <p id="resumen-coois" class="resumen-coois"></p>
+      <button id="btn-importar-coois" type="button" class="boton boton-naranja" hidden>Importar COOIS</button>
+      <button id="btn-bajar-coois-prueba" type="button" class="boton boton-secundario" hidden>Bajar COOIS de prueba</button>
+      <input id="archivo-coois" type="file" accept=".xlsx,.xls,.csv" hidden>
+      <label class="campo" for="buscar-orden">Buscar
+        <input id="buscar-orden" type="search" autocomplete="off" placeholder="Orden, código o caja">
+      </label>
+      <div id="lista-ordenes" class="lista-ordenes"></div>
+    </section>
+
+    <!-- Pantalla 4: tabla de productos -->
     <section id="pantalla-productos" class="pantalla" hidden>
       <h1>Productos</h1>
       <button id="btn-escanear-producto" type="button" class="boton boton-naranja">Escanear producto nuevo</button>
@@ -175,6 +188,7 @@
   <nav class="navegacion" aria-label="Pantallas">
     <button type="button" data-pantalla="escaneo" aria-current="page">Escanear</button>
     <button type="button" data-pantalla="historial">Historial</button>
+    <button type="button" data-pantalla="ordenes">Órdenes</button>
     <button type="button" data-pantalla="productos">Productos</button>
   </nav>
 
@@ -210,6 +224,21 @@
       <div class="dos-botones">
         <button id="btn-cancelar-filas" type="button" class="boton boton-secundario">Cancelar</button>
         <button id="btn-sumar-filas" type="submit" class="boton boton-marcha" disabled>Sumar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Ventana para importar la COOIS: qué columna del archivo es cada dato -->
+  <dialog id="dialogo-coois" class="dialogo">
+    <form id="form-coois">
+      <h2>Importar COOIS</h2>
+      <p id="coois-archivo" class="dato-suave"></p>
+      <p class="ayuda-coois">Elegí qué columna del archivo es cada dato. La próxima vez la app ya las deja elegidas.</p>
+      <div id="coois-columnas"></div>
+      <div id="coois-resultado" class="coois-resultado" aria-live="polite"></div>
+      <div class="dos-botones">
+        <button id="btn-cancelar-coois" type="button" class="boton boton-secundario">Cancelar</button>
+        <button id="btn-confirmar-coois" type="submit" class="boton boton-marcha">Importar</button>
       </div>
     </form>
   </dialog>

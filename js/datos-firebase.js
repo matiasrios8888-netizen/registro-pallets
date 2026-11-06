@@ -15,6 +15,7 @@ import {
   onSnapshot,
   setDoc,
   deleteDoc,
+  writeBatch,
 } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import {
   initializeAuth,
@@ -75,6 +76,59 @@ export async function guardarPallet(pallet) {
 // Borra un pallet cerrado. No se puede recuperar.
 export function borrarPallet(id) {
   return deleteDoc(doc(db, 'pallets', id));
+}
+
+// Las órdenes de producción de la última COOIS importada. Llama a alCambiar con
+// { ordenes, importacion }: la lista de órdenes y los datos de la importación (archivo, fecha y
+// quién la hizo), o null si todavía no se importó ninguna.
+export function escucharCoois(alCambiar, alFallar) {
+  let ordenes = null;
+  let importacion;
+  const avisar = () => {
+    if (ordenes !== null && importacion !== undefined) alCambiar({ ordenes, importacion });
+  };
+  const dejarOrdenes = onSnapshot(collection(db, 'ordenes'), (r) => {
+    ordenes = aLista(r);
+    avisar();
+  }, alFallar);
+  const dejarImportacion = onSnapshot(doc(db, 'coois', 'ultima'), (d) => {
+    importacion = d.data() ?? null;
+    avisar();
+  }, alFallar);
+  return () => {
+    dejarOrdenes();
+    dejarImportacion();
+  };
+}
+
+// El número de orden es el nombre del documento: importar de nuevo la misma orden la reemplaza.
+// Firestore no acepta "/" en ese nombre.
+const idDeOrden = (numero) => String(numero).replaceAll('/', '-');
+
+// Cada escritura de un lote le pregunta a las reglas si quien importa es supervisor, y Firestore
+// acepta pocas preguntas así por lote. Con lotes chicos nunca se pasa.
+const ESCRITURAS_POR_LOTE = 10;
+
+// Reemplaza las órdenes por las de una COOIS nueva: guarda las nuevas, borra las que ya no están
+// (idsAnteriores) y anota la importación. Sin señal la promesa no termina: usar .catch(), no await.
+export function reemplazarOrdenes(idsAnteriores, ordenes, importacion) {
+  const operaciones = [];
+  const nuevas = new Set(ordenes.map((orden) => idDeOrden(orden.numero)));
+  for (const id of idsAnteriores) {
+    if (!nuevas.has(id)) operaciones.push((lote) => lote.delete(doc(db, 'ordenes', id)));
+  }
+  for (const orden of ordenes) {
+    operaciones.push((lote) => lote.set(doc(db, 'ordenes', idDeOrden(orden.numero)), orden));
+  }
+  operaciones.push((lote) => lote.set(doc(db, 'coois', 'ultima'), importacion));
+
+  const envios = [];
+  for (let i = 0; i < operaciones.length; i += ESCRITURAS_POR_LOTE) {
+    const lote = writeBatch(db);
+    operaciones.slice(i, i + ESCRITURAS_POR_LOTE).forEach((operacion) => operacion(lote));
+    envios.push(lote.commit());
+  }
+  return Promise.all(envios);
 }
 
 // Inicio de sesión: estas funciones existen solo acá, en modo prueba no hay usuarios.

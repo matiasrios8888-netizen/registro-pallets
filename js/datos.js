@@ -28,6 +28,8 @@ export const {
   escucharPallets,
   guardarPallet,
   borrarPallet,
+  escucharCoois,
+  reemplazarOrdenes,
   // Solo con Firebase: en modo prueba no hay usuarios y quedan sin definir.
   escucharSesion,
   entrar,

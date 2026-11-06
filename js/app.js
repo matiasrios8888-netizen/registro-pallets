@@ -2,12 +2,13 @@
 import { modoPrueba } from './datos.js';
 import { alMostrarEscaneo, alOcultarEscaneo, iniciarPantallaEscaneo } from './pantalla-escaneo.js';
 import { alMostrarHistorial, iniciarPantallaHistorial } from './pantalla-historial.js';
+import { alMostrarOrdenes, iniciarPantallaOrdenes } from './pantalla-ordenes.js';
 import { iniciarProductos } from './productos.js';
 import { iniciarSesion } from './sesion.js';
 
 const botonesNavegacion = document.querySelectorAll('[data-pantalla]');
 
-// Muestra una pantalla ("escaneo", "historial" o "productos"), oculta las otras, marca su
+// Muestra una pantalla ("escaneo", "historial", "ordenes" o "productos"), oculta las otras, marca su
 // botón en la barra y le avisa a cada pantalla para que se actualice.
 function irA(pantalla) {
   document.querySelectorAll('.pantalla').forEach((seccion) => {
@@ -21,6 +22,7 @@ function irA(pantalla) {
   if (pantalla === 'escaneo') alMostrarEscaneo();
   else alOcultarEscaneo();
   if (pantalla === 'historial') alMostrarHistorial();
+  if (pantalla === 'ordenes') alMostrarOrdenes();
 }
 
 botonesNavegacion.forEach((boton) => {
@@ -35,3 +37,4 @@ await iniciarSesion();
 iniciarProductos();
 iniciarPantallaEscaneo();
 iniciarPantallaHistorial();
+iniciarPantallaOrdenes();

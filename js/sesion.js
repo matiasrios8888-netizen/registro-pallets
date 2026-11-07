@@ -2,8 +2,9 @@
 //
 // Cada persona tiene un usuario y una contraseña, que se crean en la consola de Firebase.
 // La primera vez que entra, la app le pide el nombre, que sale como responsable de sus pallets.
-// El rol "supervisor" se pone a mano en la consola: es el único que puede cambiar productos y
-// borrar pallets. Si cambia el rol, la app se vuelve a cargar sola en unos segundos.
+// El rol "supervisor" (o "administrador", que es lo mismo) se pone a mano en la consola: es el
+// único que puede cambiar productos, borrar pallets e importar la COOIS. Si cambia el rol, la app
+// se vuelve a cargar sola en unos segundos.
 import {
   modoPrueba,
   escucharSesion,
@@ -21,7 +22,14 @@ const DOMINIO_DE_USUARIOS = 'pallets.local';
 // Quien entró. En modo prueba no hay nadie, con permiso para todo.
 export const usuario = { uid: null, nombre: '', rol: modoPrueba ? 'supervisor' : '' };
 
-export const esSupervisor = () => usuario.rol === 'supervisor';
+// Roles con permiso para todo. firestore.rules tiene la misma lista: si cambia una, cambiar la otra.
+const ROLES_DE_SUPERVISOR = ['supervisor', 'administrador'];
+
+// El rol se escribe a mano en la consola, y un espacio de más o una mayúscula no se notan:
+// "Supervisor " vale como "supervisor". Las reglas de la base hacen lo mismo.
+const rolLimpio = (rol) => (typeof rol === 'string' ? rol.trim().toLowerCase() : '');
+
+export const esSupervisor = () => ROLES_DE_SUPERVISOR.includes(usuario.rol);
 
 const pantallaIngreso = document.getElementById('pantalla-ingreso');
 const formularioIngreso = document.getElementById('form-ingreso');
@@ -102,7 +110,7 @@ async function preguntarSiSale() {
 function mostrarUsuarioActual() {
   document.getElementById('sesion-actual').hidden = false;
   document.getElementById('sesion-nombre').textContent = esSupervisor()
-    ? `Entraste como ${usuario.nombre}, supervisor.`
+    ? `Entraste como ${usuario.nombre}, ${usuario.rol}.`
     : `Entraste como ${usuario.nombre}.`;
   document.getElementById('btn-salir').addEventListener('click', preguntarSiSale);
 }
@@ -134,7 +142,7 @@ export function iniciarSesion() {
         // Si después la base trae otro rol (se cambió en la consola), se vuelve a cargar la app
         // para que muestre los botones que corresponden.
         if (yaEntro) {
-          if ((datos.rol ?? '') !== usuario.rol) window.location.reload();
+          if (rolLimpio(datos.rol) !== usuario.rol) window.location.reload();
           return;
         }
         if (!datos.nombre) {
@@ -143,7 +151,7 @@ export function iniciarSesion() {
         }
         yaEntro = true;
         usuario.nombre = datos.nombre;
-        usuario.rol = datos.rol ?? '';
+        usuario.rol = rolLimpio(datos.rol);
         // Vuelve a la pantalla de arranque, la de Escanear.
         document.body.classList.remove('sin-sesion');
         pantallaIngreso.hidden = true;

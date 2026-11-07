@@ -8,16 +8,23 @@ rules_version = '2';
 // - Órdenes de producción (de la COOIS): las ve cualquiera que haya entrado. Solo el supervisor
 //   las importa. "coois" guarda los datos de la última importación.
 // - Usuarios: cada uno ve y escribe su nombre, pero no su rol. El rol se pone a mano en la
-//   consola de Firebase, y la consola no pasa por estas reglas.
+//   consola de Firebase, y la consola no pasa por estas reglas. "Supervisor" incluye a quien
+//   tenga el rol "administrador".
 service cloud.firestore {
   match /databases/{database}/documents {
     function conSesion() {
       return request.auth != null;
     }
 
+    // "administrador" es lo mismo que "supervisor". El rol se escribe a mano en la consola, así
+    // que no importan los espacios de más ni las mayúsculas. js/sesion.js tiene la misma lista.
+    function rolDeSupervisor(rol) {
+      return rol is string && rol.trim().lower() in ['supervisor', 'administrador'];
+    }
+
     function esSupervisor() {
       return conSesion()
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('rol', '') == 'supervisor';
+        && rolDeSupervisor(get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('rol', ''));
     }
 
     function nombreValido() {

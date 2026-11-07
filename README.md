@@ -118,14 +118,14 @@ Hasta publicarlas, la base no deja leer ni escribir nada. Cada vez que cambies `
 
 **6. Crear los usuarios.** En **Authentication**, pestaña **Users**, tocá **Agregar usuario**, uno por persona. No hace falta un mail real: con `juan@pallets.local`, para entrar alcanza con escribir `juan`. La contraseña tiene que tener 6 caracteres o más. La primera vez que cada uno entra, la app le pide su nombre, que después sale como responsable de sus pallets.
 
-**7. Elegir al supervisor.** Es el único que carga, cambia y borra productos, y el único que borra pallets. Los demás escanean, cierran pallets y ven el Historial. Después de que el supervisor entre por primera vez:
+**7. Elegir al supervisor.** Es el único que carga, cambia y borra productos, el único que borra pallets y el único que importa la COOIS. Los demás escanean, cierran pallets y ven el Historial. Después de que el supervisor entre por primera vez:
 
 1. En **Authentication**, copiá su **UID de usuario**.
 2. En **Firestore Database**, entrá a la colección `usuarios` y abrí el documento con ese UID.
 3. Tocá **Agregar campo**: nombre `rol`, tipo `string`, valor `supervisor`.
 4. Si el supervisor tiene la app abierta, se vuelve a cargar sola en unos segundos.
 
-El valor va todo en minúscula: con `Supervisor` no lo reconoce.
+El valor también puede ser `administrador`, con los mismos permisos. No importan las mayúsculas ni los espacios de más: `Supervisor ` vale igual. Cualquier otra palabra deja al usuario sin esos permisos. La app muestra el rol al final de Productos: "Entraste como Juan, supervisor."
 
 **8. Cargar los productos.** La base arranca vacía. El supervisor los carga desde **Productos** con **Escanear producto nuevo**. Los productos de prueba se cargan solo en modo prueba.
 
@@ -152,7 +152,7 @@ La cámara del navegador solo funciona si la página se abre por `https`: desde 
 ## Cómo se comporta
 
 - **Usuarios:** con Firebase, cada persona entra una sola vez en cada dispositivo, con su usuario y su contraseña. Para entrar hace falta internet. El nombre de quien entró se completa solo como responsable, y se puede cambiar. **Salir** está al final de Productos.
-- **Supervisor:** solo el supervisor ve los botones para cargar, cambiar y borrar productos, y el de borrar pallets. Si otro escanea un código desconocido, la app le dice que se lo pida al supervisor. La base también lo controla, aunque alguien saltee los botones. En modo prueba no hay usuarios y se puede todo.
+- **Supervisor:** solo el supervisor (o el administrador) ve los botones para cargar, cambiar y borrar productos, el de borrar pallets y el de importar la COOIS. Si otro escanea un código desconocido, la app le dice que se lo pida al supervisor. La base también lo controla, aunque alguien saltee los botones. En modo prueba no hay usuarios y se puede todo.
 - **Órdenes (COOIS):** el supervisor importa cada día la COOIS, el Excel que exporta SAP con las órdenes de producción. **Importar COOIS** abre una ventana para elegir qué columna del archivo es cada dato: número de orden, código interno, descripción, cantidades y fecha. La app deja elegidas las que reconoce por el nombre y recuerda la elección para la próxima vez. Para saber cuánto le falta a cada orden alcanza con la cantidad pendiente, o con la cantidad de la orden y la entregada. Antes de importar muestra cuántas órdenes entran y cuáles quedan afuera: las ya completas, las filas sin número o sin código, y las órdenes repetidas. También avisa los códigos que no están en Productos. Cada COOIS reemplaza a la anterior. Todos ven las órdenes de cada producto, de la más vieja a la más nueva. En **Buscar** se puede escribir una orden o un código, o escanear una caja.
 - **Total por producto:** Historial suma todos los pallets del día por producto, que es lo que se descuenta de las órdenes. El Excel trae la misma tabla en una segunda hoja, **Por producto**. La primera hoja, **Pallets**, sigue con una fila por producto de cada pallet.
 - **Foco:** el campo de la pistola recupera el cursor solo. Si la etiqueta dice en rojo "Tocá acá para volver a leer", la app no es la ventana activa y la pistola estaría escribiendo en otro programa.

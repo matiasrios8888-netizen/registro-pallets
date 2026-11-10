@@ -222,7 +222,7 @@
       <label class="campo" for="cantidad-cajas">Cajas
         <input id="cantidad-cajas" type="number" min="1" step="1" inputmode="numeric" autocomplete="off">
       </label>
-      <p class="ayuda-cantidad">O contalas por filas, por ejemplo las del medio del pallet:</p>
+      <p id="cantidad-ayuda" class="ayuda-cantidad">O contalas por filas, por ejemplo las del medio del pallet:</p>
       <div class="dos-botones">
         <label class="campo" for="cantidad-por-fila">Cajas por fila
           <input id="cantidad-por-fila" type="number" min="1" step="1" inputmode="numeric" autocomplete="off">
@@ -286,10 +286,20 @@
       <label class="campo" for="campo-unidades">Unidades en ese envase
         <input id="campo-unidades" type="number" min="1" max="100000" step="1" inputmode="numeric" required>
       </label>
-      <label class="campo" for="campo-cajas-por-pallet">Cajas en un pallet completo
-        <input id="campo-cajas-por-pallet" type="number" min="1" max="9999" step="1" inputmode="numeric" autocomplete="off">
-      </label>
-      <p class="ayuda-campo">Si lo sabés. Con este dato, al cargar un pallet avisa si se pasa.</p>
+      <!-- Cómo se arma un pallet completo de este envase, como en la ficha de embalaje:
+           cuántas cajas van en cada fila (la base) y cuántas filas entran. -->
+      <fieldset class="campo-pallet">
+        <legend>Pallet completo</legend>
+        <div class="dos-botones">
+          <label class="campo" for="campo-cajas-por-fila">Cajas por fila
+            <input id="campo-cajas-por-fila" type="number" min="1" max="999" step="1" inputmode="numeric" autocomplete="off">
+          </label>
+          <label class="campo" for="campo-filas-por-pallet">Filas
+            <input id="campo-filas-por-pallet" type="number" min="1" max="99" step="1" inputmode="numeric" autocomplete="off">
+          </label>
+        </div>
+        <p id="ayuda-pallet" class="ayuda-campo"></p>
+      </fieldset>
       <p id="mensaje-formulario" class="mensaje-error" hidden></p>
       <div class="dos-botones">
         <button id="btn-cancelar-producto" type="button" class="boton boton-secundario">Cancelar</button>

@@ -5,7 +5,7 @@ import { productosDePrueba } from './datos-prueba.js';
 // No usa claveLocal() de datos.js: este archivo se carga desde ahí, y se esperarían el uno al
 // otro. Es lo mismo, porque este archivo solo existe en modo prueba.
 // El de productos cambia cuando cambian los productos de prueba: así se cargan los nuevos.
-const CLAVE_PRODUCTOS = 'registro-pallets.prueba.productos-3';
+const CLAVE_PRODUCTOS = 'registro-pallets.prueba.productos-4';
 const CLAVE_PALLETS = 'registro-pallets.prueba.pallets';
 const CLAVE_ORDENES = 'registro-pallets.prueba.ordenes';
 const CLAVE_IMPORTACION = 'registro-pallets.prueba.importacion-coois';

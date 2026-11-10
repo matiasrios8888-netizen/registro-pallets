@@ -114,6 +114,7 @@ const formularioCantidad = document.getElementById('form-cantidad');
 const campoCajas = document.getElementById('cantidad-cajas');
 const campoCajasPorFila = document.getElementById('cantidad-por-fila');
 const campoFilas = document.getElementById('cantidad-filas');
+const ayudaCantidad = document.getElementById('cantidad-ayuda');
 const cuentaDeCantidad = document.getElementById('cantidad-cuenta');
 const avisoEnVentana = document.getElementById('cantidad-aviso');
 const botonSumarCantidad = document.getElementById('btn-sumar-cantidad');
@@ -654,18 +655,22 @@ function elegirModoDeCarga(cantidad) {
   enfocarLector();
 }
 
-// Abre la ventana para escribir cuántas cajas de ese producto se suman.
+// Abre la ventana para escribir cuántas cajas de ese producto se suman. Si en Productos dice
+// cuántas cajas van en cada fila del pallet, ya viene puesto: solo falta escribir las filas.
 function abrirDialogoDeCantidad(producto) {
   productoDeCantidad = producto;
   document.getElementById('cantidad-producto').textContent = `${producto.codigoInterno}: ${producto.descripcion}`;
   document.getElementById('cantidad-envase').textContent =
     `${NOMBRE_ENVASE[producto.envase]} de ${unidades(producto.unidadesPorCaja)}`;
+  ayudaCantidad.textContent = producto.cajasPorFila
+    ? `O contalas por filas. En un pallet completo van ${producto.cajasPorFila} cajas por fila y hasta ${producto.filasPorPallet} filas:`
+    : 'O contalas por filas, por ejemplo las del medio del pallet:';
   campoCajas.value = '';
-  campoCajasPorFila.value = '';
+  campoCajasPorFila.value = producto.cajasPorFila || '';
   campoFilas.value = '';
   pintarCuentaDeCantidad();
   dialogoCantidad.showModal();
-  campoCajas.focus();
+  (producto.cajasPorFila ? campoFilas : campoCajas).focus();
 }
 
 // Devuelve el número escrito en ese campo, o 0 si no es un entero mayor que cero.
@@ -681,9 +686,13 @@ function cantidadEscrita() {
   return { total: cajasPorFila * filas, cajasPorFila, filas };
 }
 
-// Cuántas cajas de ese producto y envase tendría el pallet con las que se suman, y el aviso si
-// pasan las de un pallet completo. Devuelve el texto del aviso, o vacío.
-function avisoDeCantidad(producto, total) {
+// Avisa si se escribieron más filas de las que entran en un pallet completo, o si con las que
+// se suman el pallet tendría más cajas de ese producto y envase que uno completo. No frena:
+// solo avisa. filas es 0 si se escribió el total. Devuelve el texto del aviso, o vacío.
+function avisoDeCantidad(producto, total, filas = 0) {
+  if (filas && producto.filasPorPallet && filas > producto.filasPorPallet) {
+    return `Son ${filas} filas, y en un pallet completo de ${producto.codigoInterno} entran ${producto.filasPorPallet}.`;
+  }
   const maximo = producto.cajasPorPallet;
   if (!maximo) return '';
   const yaHay = pallet.lecturas.filter((l) => l.codigoInterno === producto.codigoInterno
@@ -699,7 +708,7 @@ function pintarCuentaDeCantidad() {
   const valida = total > 0 && total <= MAXIMO_CAJAS_A_MANO;
   botonSumarCantidad.disabled = !valida;
   botonSumarCantidad.textContent = valida ? `Sumar ${cajas(total)}` : 'Sumar';
-  const aviso = valida ? avisoDeCantidad(productoDeCantidad, total) : '';
+  const aviso = valida ? avisoDeCantidad(productoDeCantidad, total, filas) : '';
   avisoEnVentana.hidden = !aviso;
   avisoEnVentana.textContent = aviso;
   if (valida) {
@@ -707,6 +716,8 @@ function pintarCuentaDeCantidad() {
     cuentaDeCantidad.textContent = `${filasEscritas}${cajas(total)}, ${unidades(total * productoDeCantidad.unidadesPorCaja)}`;
   } else if (total > MAXIMO_CAJAS_A_MANO) {
     cuentaDeCantidad.textContent = `Son más de ${MAXIMO_CAJAS_A_MANO} cajas: revisá los números.`;
+  } else if (campoCajasPorFila.value && !campoFilas.value) {
+    cuentaDeCantidad.textContent = 'Escribí cuántas filas son.';
   } else {
     cuentaDeCantidad.textContent = campoCajasPorFila.value || campoFilas.value
       ? 'Escribí cajas por fila y filas.'
@@ -715,12 +726,16 @@ function pintarCuentaDeCantidad() {
 }
 
 // El total y las filas son dos maneras de decir lo mismo: al escribir en una se borra la otra.
+// Si se escribió el total y después se vuelve a las filas, vuelven las cajas por fila de Productos.
 function alEscribirCantidad(evento) {
   if (evento.target === campoCajas) {
     campoCajasPorFila.value = '';
     campoFilas.value = '';
   } else {
     campoCajas.value = '';
+    if (evento.target === campoFilas && campoCajasPorFila.value === '' && productoDeCantidad.cajasPorFila) {
+      campoCajasPorFila.value = productoDeCantidad.cajasPorFila;
+    }
   }
   pintarCuentaDeCantidad();
 }
@@ -733,7 +748,7 @@ async function sumarCantidad(evento) {
   const producto = productoDeCantidad;
   const { total, cajasPorFila, filas } = cantidadEscrita();
   const totalDeUnidades = unidades(total * producto.unidadesPorCaja);
-  const aviso = avisoDeCantidad(producto, total);
+  const aviso = avisoDeCantidad(producto, total, filas);
   dialogoCantidad.close();
   const confirmada = await confirmar({
     titulo: `¿Confirmás ${cajas(total)} = ${totalDeUnidades}?`,

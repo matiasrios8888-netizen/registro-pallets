@@ -20,6 +20,8 @@ import {
 // NOMBRE_ENVASE). Los topes frenan una lectura de la pistola que cayó en el campo equivocado.
 const UNIDADES_POR_CAJA_MAXIMAS = 100000;
 const CAJAS_POR_PALLET_MAXIMAS = 9999;
+const CAJAS_POR_FILA_MAXIMAS = 999;
+const FILAS_POR_PALLET_MAXIMAS = 99;
 
 let productos = [];
 let cargados = false;
@@ -42,8 +44,10 @@ const campoBarras = document.getElementById('campo-barras');
 const campoInterno = document.getElementById('campo-interno');
 const campoDescripcion = document.getElementById('campo-descripcion');
 const campoUnidades = document.getElementById('campo-unidades');
-const campoCajasPorPallet = document.getElementById('campo-cajas-por-pallet');
-const camposEnOrden = [campoBarras, campoInterno, campoDescripcion, campoUnidades, campoCajasPorPallet];
+const campoCajasPorFila = document.getElementById('campo-cajas-por-fila');
+const campoFilasPorPallet = document.getElementById('campo-filas-por-pallet');
+const ayudaPallet = document.getElementById('ayuda-pallet');
+const camposEnOrden = [campoBarras, campoInterno, campoDescripcion, campoUnidades, campoCajasPorFila, campoFilasPorPallet];
 const mensajeFormulario = document.getElementById('mensaje-formulario');
 const botonLeerBarras = document.getElementById('btn-leer-barras');
 const marcoLeerBarras = document.getElementById('marco-leer-barras');
@@ -77,6 +81,19 @@ function envaseValido(valor) {
 // con 1. Solo sirve para dejar marcada una opción en el formulario: se ve y se puede cambiar.
 const envaseSegunCodigo = (codigo) => (/^1\d{13}$/.test(codigo) ? 'uv' : 'contenedora');
 
+// Cómo se arma un pallet completo de este envase, como en la ficha de embalaje: cajasPorFila
+// (la base) y filasPorPallet (cuántas filas entran). cajasPorPallet es la cuenta, y es lo que
+// usan los avisos. Van las dos o ninguna; sin ellas todo queda en 0 y no avisa nada. Una fila
+// cargada antes de que existieran las filas solo tiene cajasPorPallet, y se respeta.
+function palletCompleto(producto) {
+  const cajasPorFila = enteroValido(producto.cajasPorFila, CAJAS_POR_FILA_MAXIMAS);
+  const filasPorPallet = enteroValido(producto.filasPorPallet, FILAS_POR_PALLET_MAXIMAS);
+  if (cajasPorFila && filasPorPallet) {
+    return { cajasPorFila, filasPorPallet, cajasPorPallet: cajasPorFila * filasPorPallet };
+  }
+  return { cajasPorFila: 0, filasPorPallet: 0, cajasPorPallet: enteroValido(producto.cajasPorPallet, CAJAS_POR_PALLET_MAXIMAS) };
+}
+
 // Un producto cargado a mano desde la consola de Firebase puede traer campos que faltan o
 // números guardados como texto. Acá todos quedan con la misma forma.
 const productoCompleto = (producto) => ({
@@ -86,9 +103,13 @@ const productoCompleto = (producto) => ({
   descripcion: String(producto.descripcion ?? ''),
   envase: envaseValido(producto.envase),
   unidadesPorCaja: enteroValido(producto.unidadesPorCaja, UNIDADES_POR_CAJA_MAXIMAS),
-  // Cuántas cajas de este envase llenan un pallet. 0 si no se sabe: entonces no avisa nada.
-  cajasPorPallet: enteroValido(producto.cajasPorPallet, CAJAS_POR_PALLET_MAXIMAS),
+  ...palletCompleto(producto),
 });
+
+// "Pallet completo: 6 × 3 = 18 cajas", o "Pallet completo: 18 cajas" en una fila de antes.
+const textoDePallet = (producto) => (producto.cajasPorFila
+  ? `Pallet completo: ${producto.cajasPorFila} × ${producto.filasPorPallet} = ${cajas(producto.cajasPorPallet)}`
+  : `Pallet completo: ${cajas(producto.cajasPorPallet)}`);
 
 // Algunas pistolas agregan o sacan ceros adelante de un código numérico (0779... y 779...).
 // Para comparar, los ignoramos.
@@ -143,12 +164,29 @@ function abrirFormulario(producto) {
   campoDescripcion.value = producto.descripcion ?? '';
   formulario.elements.envase.value = producto.envase ?? envaseSegunCodigo(campoBarras.value);
   campoUnidades.value = producto.unidadesPorCaja ?? '';
-  campoCajasPorPallet.value = producto.cajasPorPallet || '';
+  campoCajasPorFila.value = producto.cajasPorFila || '';
+  campoFilasPorPallet.value = producto.filasPorPallet || '';
+  pintarAyudaDePallet();
   mensajeFormulario.hidden = true;
   // Desde Escanear el código ya vino leído, y la cámara de esa pantalla puede seguir prendida.
   botonLeerBarras.hidden = Boolean(alGuardarFormulario);
   dialogo.showModal();
   enfocarCampoQueFalta();
+}
+
+// Abajo de Pallet completo muestra la cuenta mientras se escribe, o para qué sirve el dato.
+function pintarAyudaDePallet() {
+  const cajasPorFila = enteroValido(campoCajasPorFila.value, CAJAS_POR_FILA_MAXIMAS);
+  const filas = enteroValido(campoFilasPorPallet.value, FILAS_POR_PALLET_MAXIMAS);
+  // Una fila de antes, con el total pero sin las filas.
+  const totalDeAntes = productoEnEdicion && !productoEnEdicion.cajasPorFila ? productoEnEdicion.cajasPorPallet : 0;
+  if (cajasPorFila && filas) {
+    ayudaPallet.textContent = `${cajasPorFila} × ${filas} = ${cajas(cajasPorFila * filas)} por pallet.`;
+  } else if (totalDeAntes) {
+    ayudaPallet.textContent = `Antes decía ${cajas(totalDeAntes)} por pallet. Para que siga avisando si se pasa, escribí cajas por fila y filas.`;
+  } else {
+    ayudaPallet.textContent = 'Si lo sabés: cuántas cajas van en cada fila del pallet y cuántas filas entran. Así, al cargar un pallet avisa si se pasa.';
+  }
 }
 
 // Deja el cursor en el primer campo que falta completar.
@@ -278,14 +316,23 @@ function guardarFormulario(evento) {
     envase: formulario.elements.envase.value,
     unidadesPorCaja: Number(campoUnidades.value),
   };
-  // Es optativo: si queda vacío no se guarda, y al cargar un pallet no se avisa si se pasa.
-  const cajasPorPallet = Number(campoCajasPorPallet.value);
-  if (cajasPorPallet > 0) datos.cajasPorPallet = cajasPorPallet;
-
   // required acepta un campo con solo espacios, y recién acá quedan vacíos.
   if (!datos.codigoInterno || !datos.descripcion) {
     mostrarErrorDeFormulario('Faltan el código interno o la descripción.');
     return;
+  }
+
+  // Pallet completo es optativo: si queda vacío no se guarda, y al cargar un pallet no se avisa
+  // si se pasa. Van las dos o ninguna: con una sola no se sabe cuántas cajas entran.
+  // cajasPorPallet se guarda también, para las versiones de la app que solo leen ese dato.
+  const cajasPorFila = enteroValido(campoCajasPorFila.value, CAJAS_POR_FILA_MAXIMAS);
+  const filasPorPallet = enteroValido(campoFilasPorPallet.value, FILAS_POR_PALLET_MAXIMAS);
+  if ((campoCajasPorFila.value === '') !== (campoFilasPorPallet.value === '')) {
+    mostrarErrorDeFormulario('En Pallet completo van las dos: cajas por fila y filas. Escribí la que falta, o borrá la que pusiste.');
+    return;
+  }
+  if (cajasPorFila && filasPorPallet) {
+    Object.assign(datos, { cajasPorFila, filasPorPallet, cajasPorPallet: cajasPorFila * filasPorPallet });
   }
 
   const repetido = filaQueChoca(datos, id);
@@ -318,7 +365,7 @@ function filaProducto(producto) {
       crear('strong', { class: 'codigo' }, producto.codigoInterno),
       crear('span', {}, producto.descripcion),
       crear('span', { class: 'dato-envase' }, `${NOMBRE_ENVASE[producto.envase]} de ${unidades(producto.unidadesPorCaja)}`),
-      producto.cajasPorPallet ? crear('span', {}, `Pallet completo: ${cajas(producto.cajasPorPallet)}`) : '',
+      producto.cajasPorPallet ? crear('span', {}, textoDePallet(producto)) : '',
       crear('span', { class: 'dato-suave' },
         producto.codigoBarras ? `Código de barras ${producto.codigoBarras}` : 'Sin código de barras')),
     esSupervisor() ? crear('div', { class: 'fila-botones' },
@@ -414,6 +461,8 @@ export function iniciarProductos() {
   formulario.addEventListener('keydown', pasarAlCampoSiguiente);
   campoBarras.addEventListener('change', sugerirEnvase);
   campoInterno.addEventListener('change', completarDescripcion);
+  campoCajasPorFila.addEventListener('input', pintarAyudaDePallet);
+  campoFilasPorPallet.addEventListener('input', pintarAyudaDePallet);
   // Sale por cualquier lado (Guardar, Cancelar, tecla Atrás): la cámara no puede quedar prendida.
   // Sin leyendo apagaría la de la pantalla Escanear, que sigue abierta atrás del formulario.
   dialogo.addEventListener('close', () => {

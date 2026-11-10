@@ -886,14 +886,21 @@ select {
   font-weight: 500;
 }
 
-/* Tipo de envase de un producto: dos opciones grandes, para tocarlas con guantes. */
-.campo-envase {
+/* Tipo de envase de un producto: dos opciones grandes, para tocarlas con guantes. Pallet
+   completo usa el mismo marco: un título y dos campos lado a lado. */
+.campo-envase,
+.campo-pallet {
   margin: 14px 0;
   padding: 0;
   border: 0;
 }
 
-.campo-envase legend {
+.campo-pallet .ayuda-campo {
+  margin-top: 0;
+}
+
+.campo-envase legend,
+.campo-pallet legend {
   margin-bottom: 6px;
   padding: 0;
   font-weight: 600;

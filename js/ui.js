@@ -105,7 +105,8 @@ export function senalError() {
 // Mensaje que aparece un rato abajo de la pantalla.
 let temporizadorAviso;
 
-// Con tipo "error" sale en rojo y dura 10 segundos; si no, 4.
+// Con tipo "error" sale en rojo y dura 10 segundos; si no, 4. Con tipo "ok" sale en verde: es
+// para cuando algo salió bien, como "Pallet 12 cargado en sistema".
 export function avisar(mensaje, tipo = 'normal') {
   const aviso = document.getElementById('aviso');
   aviso.textContent = mensaje;

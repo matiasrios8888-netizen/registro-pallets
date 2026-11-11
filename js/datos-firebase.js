@@ -16,6 +16,7 @@ import {
   setDoc,
   deleteDoc,
   writeBatch,
+  waitForPendingWrites,
 } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import {
   initializeAuth,
@@ -60,9 +61,16 @@ export function borrarProducto(id) {
 }
 
 // Igual que escucharProductos, para los pallets cerrados de una fecha ("2026-11-01").
+// Cada pallet trae además "pendiente": se cerró en este dispositivo y todavía no llegó a la base.
+// El segundo dato de alCambiar dice si la lista vino de la base (true) o de la copia guardada en
+// el dispositivo, que al abrir la app puede estar incompleta.
 export function escucharPallets(fecha, alCambiar, alFallar) {
   const palletsDelDia = query(collection(db, 'pallets'), where('fecha', '==', fecha));
-  return onSnapshot(palletsDelDia, (r) => alCambiar(aLista(r)), alFallar);
+  // includeMetadataChanges: también avisa cuando un pallet pasa de pendiente a subido.
+  return onSnapshot(palletsDelDia, { includeMetadataChanges: true }, (r) => alCambiar(
+    r.docs.map((d) => ({ ...d.data(), id: d.id, pendiente: d.metadata.hasPendingWrites })),
+    !r.metadata.fromCache,
+  ), alFallar);
 }
 
 // async: si un dato es inválido, setDoc falla en el momento y no con la promesa. Así ese
@@ -133,9 +141,20 @@ export function reemplazarOrdenes(idsAnteriores, ordenes, importacion) {
 
 // Inicio de sesión: estas funciones existen solo acá, en modo prueba no hay usuarios.
 
-// Llama a alCambiar ahora y cada vez que alguien entra o sale: con { uid } o con null.
+// Llama a alCambiar ahora y cada vez que alguien entra o sale: con { uid, correo } o con null.
 export function escucharSesion(alCambiar) {
-  return onAuthStateChanged(auth, (cuenta) => alCambiar(cuenta && { uid: cuenta.uid }));
+  return onAuthStateChanged(auth, (cuenta) => alCambiar(cuenta && { uid: cuenta.uid, correo: cuenta.email ?? '' }));
+}
+
+// Devuelve true si todo lo que se guardó en este dispositivo ya llegó a la base. Espera hasta
+// "milisegundos" y si no terminó devuelve false: sin señal, waitForPendingWrites no termina nunca.
+// Lo que no subió queda en una cola de quien lo guardó: si sale y entra otra persona, sube recién
+// cuando vuelva a entrar la primera.
+export function esperarSubida(milisegundos) {
+  return Promise.race([
+    waitForPendingWrites(db).then(() => true, () => false),
+    new Promise((listo) => { setTimeout(() => listo(false), milisegundos); }),
+  ]);
 }
 
 // Entra con correo y contraseña. Falla si están mal o si no hay internet.

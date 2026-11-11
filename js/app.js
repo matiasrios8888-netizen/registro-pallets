@@ -1,10 +1,10 @@
 // Arranque de la app y navegación entre las tres pantallas.
 import { modoPrueba } from './datos.js';
-import { alMostrarEscaneo, alOcultarEscaneo, iniciarPantallaEscaneo } from './pantalla-escaneo.js';
+import { alMostrarEscaneo, alOcultarEscaneo, iniciarPantallaEscaneo, palletAbierto } from './pantalla-escaneo.js';
 import { alMostrarHistorial, iniciarPantallaHistorial } from './pantalla-historial.js';
 import { alMostrarOrdenes, iniciarPantallaOrdenes } from './pantalla-ordenes.js';
 import { iniciarProductos } from './productos.js';
-import { iniciarSesion } from './sesion.js';
+import { conectarConEscaneo, iniciarSesion } from './sesion.js';
 
 const botonesNavegacion = document.querySelectorAll('[data-pantalla]');
 
@@ -30,6 +30,9 @@ botonesNavegacion.forEach((boton) => {
 });
 
 document.getElementById('banner-modo-prueba').hidden = !modoPrueba;
+
+// Para no cambiar de usuario con un pallet abierto.
+conectarConEscaneo({ palletAbierto, irAlPallet: () => irA('escaneo') });
 
 // Con Firebase, las pantallas arrancan recién cuando alguien entró: sin sesión, la base no deja
 // leer nada.

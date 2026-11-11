@@ -48,6 +48,7 @@ const ESPERA_EN_MODO_RAPIDO_MS = 2000;
 const MAXIMO_CAJAS_A_MANO = 999;
 const ALTO_BARRA_INFERIOR = 100;
 const DIAS_DE_MARGEN_EN_LA_FECHA = 31;
+const ESPERA_PARA_SUBIR_MS = 3000;
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
 // El pallet que se está armando: { numero, fecha, responsable, lecturas }. Cada lectura es
@@ -602,6 +603,13 @@ async function cerrarPallet() {
 
   const palletCerrado = pallet;
   const numero = numeroParaCerrar();
+  const totales = `${cajas(totalCajas)} y ${unidades(totalUnidades)}`;
+
+  // Con señal la base contesta enseguida. Si no contestó a tiempo, el pallet quedó guardado en el
+  // celular y Firestore lo sube solo cuando vuelve la señal: ahí sale el aviso verde.
+  const avisoSinSenal = setTimeout(() => {
+    avisar(`Pallet ${numero} guardado en el celular. Se carga en el sistema cuando vuelva la señal.`);
+  }, ESPERA_PARA_SUBIR_MS);
 
   guardarPallet({
     numero,
@@ -611,7 +619,11 @@ async function cerrarPallet() {
     totalCajas,
     totalUnidades,
     items: itemsParaGuardar(items),
-  }).catch((error) => {
+  }).then(() => {
+    clearTimeout(avisoSinSenal);
+    avisar(`✓ Pallet ${numero} cargado en sistema: ${totales}`, 'ok');
+  }, (error) => {
+    clearTimeout(avisoSinSenal);
     // Si Firebase lo rechaza, las cajas vuelven a la pantalla en vez de perderse.
     guardarRechazados([...leerRechazados(), { ...palletCerrado, numero }]);
     const cuando = pallet ? 'van a volver cuando termines este pallet' : 'volvieron a la pantalla';
@@ -620,8 +632,11 @@ async function cerrarPallet() {
   });
 
   terminarPallet();
-  avisar(`Pallet ${numero} cerrado: ${cajas(totalCajas)} y ${unidades(totalUnidades)}`);
+  avisar(`Pallet ${numero} cerrado: ${totales}`);
 }
+
+// El pallet que se está armando, para no cambiar de usuario con uno abierto. null si no hay.
+export const palletAbierto = () => (pallet ? { numero: pallet.numero, cajas: pallet.lecturas.length } : null);
 
 // Borra el pallet abierto. Si ya tiene cajas, pregunta antes.
 async function descartarPallet() {

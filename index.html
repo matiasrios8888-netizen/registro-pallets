@@ -22,10 +22,21 @@
   <p id="banner-modo-prueba" class="banner" hidden>Modo prueba: los datos quedan solo en este dispositivo.</p>
 
   <main>
+    <!-- Quién entró, siempre a la vista: hay celulares que usan varias personas. Solo con Firebase. -->
+    <div id="barra-usuario" class="barra-usuario" hidden>
+      <p id="sesion-nombre"></p>
+      <button id="btn-cambiar-usuario" type="button" class="boton boton-secundario">Cambiar de usuario</button>
+    </div>
+
     <!-- Ingreso: solo con Firebase. Cada persona entra una vez en cada dispositivo. -->
     <section id="pantalla-ingreso" class="pantalla vista-apertura" hidden>
       <form id="form-ingreso">
         <h1>Entrar</h1>
+        <!-- Los últimos que entraron en este dispositivo: tocar uno completa el usuario. -->
+        <div id="usuarios-recientes" class="usuarios-recientes" hidden>
+          <p>Tocá tu nombre, o escribí tu usuario abajo:</p>
+          <div id="botones-recientes" class="botones-recientes"></div>
+        </div>
         <label class="campo" for="ingreso-usuario">Usuario
           <input id="ingreso-usuario" autocomplete="username" autocapitalize="none" spellcheck="false" required>
         </label>
@@ -144,19 +155,36 @@
       </div>
     </section>
 
-    <!-- Pantalla 2: pallets cerrados de un día, su detalle y exportación a Excel -->
+    <!-- Pantalla 2, Panel: los pallets cerrados de un día, que aparecen solos a medida que se
+         cierran en cualquier celular. Su detalle, el total por producto y el Excel. -->
     <section id="pantalla-historial" class="pantalla" hidden>
-      <h1>Historial</h1>
-      <label class="campo" for="fecha-historial">Fecha
-        <input id="fecha-historial" type="date">
-      </label>
+      <h1>Pallets del día</h1>
+      <div class="panel-controles">
+        <label class="campo" for="fecha-historial">Fecha
+          <input id="fecha-historial" type="date">
+        </label>
+        <button id="btn-exportar" type="button" class="boton boton-naranja">Exportar a Excel</button>
+      </div>
       <p id="resumen-dia" class="resumen"></p>
-      <button id="btn-exportar" type="button" class="boton boton-naranja">Exportar a Excel</button>
-      <section id="totales-dia" class="totales-dia" aria-labelledby="titulo-totales" hidden>
-        <h2 id="titulo-totales">Total por producto</h2>
-        <div id="tabla-totales"></div>
-      </section>
-      <div id="lista-pallets" class="lista-pallets"></div>
+      <dl id="contadores-dia" class="contadores-dia" hidden>
+        <div class="contador-dia"><dt>Pallets</dt><dd id="cuenta-pallets"></dd></div>
+        <div class="contador-dia"><dt>Cajas</dt><dd id="cuenta-cajas"></dd></div>
+        <div class="contador-dia"><dt>Unidades</dt><dd id="cuenta-unidades"></dd></div>
+      </dl>
+      <div class="panel-cuerpo">
+        <section class="panel-pallets" aria-label="Pallets">
+          <!-- Títulos de las columnas: solo en pantallas grandes, donde cada pallet es una fila. -->
+          <div id="columnas-pallets" class="columnas-pallets" aria-hidden="true" hidden>
+            <span>Pallet</span><span>Hora</span><span>Responsable</span><span>Productos</span>
+            <span class="numero">Cajas</span><span class="numero">Unidades</span><span>Estado</span>
+          </div>
+          <div id="lista-pallets" class="lista-pallets"></div>
+        </section>
+        <section id="totales-dia" class="totales-dia" aria-labelledby="titulo-totales" hidden>
+          <h2 id="titulo-totales">Total por producto</h2>
+          <div id="tabla-totales"></div>
+        </section>
+      </div>
     </section>
 
     <!-- Pantalla 3: órdenes de producción abiertas, que vienen de la COOIS de SAP -->
@@ -183,16 +211,12 @@
         <input id="buscar-producto" type="search" autocomplete="off" placeholder="Código o descripción">
       </label>
       <ul id="lista-productos" class="lista"></ul>
-      <div id="sesion-actual" class="sesion-actual" hidden>
-        <p id="sesion-nombre"></p>
-        <button id="btn-salir" type="button" class="boton boton-secundario">Salir</button>
-      </div>
     </section>
   </main>
 
   <nav class="navegacion" aria-label="Pantallas">
     <button type="button" data-pantalla="escaneo" aria-current="page">Escanear</button>
-    <button type="button" data-pantalla="historial">Historial</button>
+    <button type="button" data-pantalla="historial">Panel</button>
     <button type="button" data-pantalla="ordenes">Órdenes</button>
     <button type="button" data-pantalla="productos">Productos</button>
   </nav>

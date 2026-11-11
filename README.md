@@ -30,11 +30,11 @@ Registro De Palets/
 │   ├── app.js              Arranca la app y cambia de pantalla
 │   ├── lector.js           Lee los códigos: la pistola y la cámara
 │   ├── pantalla-escaneo.js Abre el pallet, suma cajas, deshace y cierra
-│   ├── pantalla-historial.js  Pallets de un día, su detalle y el Excel
+│   ├── pantalla-historial.js  Panel: los pallets del día, su detalle y el Excel
 │   ├── pantalla-ordenes.js Órdenes de producción abiertas e importar la COOIS
 │   ├── coois.js            Lee el Excel de la COOIS y lo pasa a órdenes
 │   ├── productos.js        Busca productos por código y maneja esa pantalla
-│   ├── sesion.js           Entrar y salir, y qué puede hacer cada usuario
+│   ├── sesion.js           Entrar, cambiar de usuario y qué puede hacer cada uno
 │   ├── datos.js            Elige dónde guardar: Firebase o este navegador
 │   ├── datos-firebase.js   Guarda en Firestore
 │   ├── datos-local.js      Guarda en el navegador (modo prueba)
@@ -118,14 +118,14 @@ Hasta publicarlas, la base no deja leer ni escribir nada. Cada vez que cambies `
 
 **6. Crear los usuarios.** En **Authentication**, pestaña **Users**, tocá **Agregar usuario**, uno por persona. No hace falta un mail real: con `juan@pallets.local`, para entrar alcanza con escribir `juan`. La contraseña tiene que tener 6 caracteres o más. La primera vez que cada uno entra, la app le pide su nombre, que después sale como responsable de sus pallets.
 
-**7. Elegir al supervisor.** Es el único que carga, cambia y borra productos, el único que borra pallets y el único que importa la COOIS. Los demás escanean, cierran pallets y ven el Historial. Después de que el supervisor entre por primera vez:
+**7. Elegir al supervisor.** Es el único que carga, cambia y borra productos, el único que borra pallets y el único que importa la COOIS. Los demás escanean, cierran pallets y ven el Panel. Después de que el supervisor entre por primera vez:
 
 1. En **Authentication**, copiá su **UID de usuario**.
 2. En **Firestore Database**, entrá a la colección `usuarios` y abrí el documento con ese UID.
 3. Tocá **Agregar campo**: nombre `rol`, tipo `string`, valor `supervisor`.
 4. Si el supervisor tiene la app abierta, se vuelve a cargar sola en unos segundos.
 
-El valor también puede ser `administrador`, con los mismos permisos. No importan las mayúsculas ni los espacios de más: `Supervisor ` vale igual. Cualquier otra palabra deja al usuario sin esos permisos. La app muestra el rol al final de Productos: "Entraste como Juan, supervisor."
+El valor también puede ser `administrador`, con los mismos permisos. No importan las mayúsculas ni los espacios de más: `Supervisor ` vale igual. Cualquier otra palabra deja al usuario sin esos permisos. La app muestra el rol en la barra de arriba: "Entraste como Juan, supervisor."
 
 **8. Cargar los productos.** La base arranca vacía. El supervisor los carga desde **Productos** con **Escanear producto nuevo**. Los productos de prueba se cargan solo en modo prueba.
 
@@ -151,12 +151,16 @@ La cámara del navegador solo funciona si la página se abre por `https`: desde 
 
 ## Cómo se comporta
 
-- **Usuarios:** con Firebase, cada persona entra una sola vez en cada dispositivo, con su usuario y su contraseña. Para entrar hace falta internet. El nombre de quien entró se completa solo como responsable, y se puede cambiar. **Salir** está al final de Productos.
+- **Usuarios:** con Firebase, cada persona entra con su usuario y su contraseña, y la sesión queda guardada en ese dispositivo. Para entrar hace falta internet. Arriba de todas las pantallas dice quién entró, y al abrir un pallet su nombre se completa solo como responsable, que se puede cambiar. La pantalla de ingreso muestra a los últimos que entraron en ese dispositivo: tocar un nombre completa el usuario y solo falta la contraseña, que nunca se guarda.
+- **Cambiar de usuario:** el botón está arriba, en todas las pantallas. Con un pallet abierto no deja: hay que cerrarlo o descartarlo, para que no quede a nombre de otra persona. Si algo se cerró sin señal y todavía no subió, avisa y ofrece **Esperar** o **Salir igual**. Lo que no subió queda guardado para quien lo cerró, y sube recién cuando esa persona vuelva a entrar en ese dispositivo.
+- **Panel:** los pallets del día de todos los dispositivos, que aparecen solos a medida que se cierran. Arriba, en números grandes, los pallets, las cajas y las unidades del día, y al costado o abajo el total por producto. En la PC cada pallet es una fila con pallet, hora, responsable, productos, cajas, unidades y estado. Tocar un pallet muestra su detalle. Se puede elegir otra fecha.
+- **Cargado en sistema:** al cerrar un pallet, cuando la base confirma que lo recibió aparece en verde "✓ Pallet 12 cargado en sistema". Sin señal, a los 3 segundos avisa que quedó guardado en el celular y que se carga cuando vuelva la señal. Si la app sigue abierta, al subir aparece el aviso verde. En el Panel cada pallet dice "✓ En el sistema" o "Falta subir (sin señal)".
+- **Avisos en el Panel:** con el Panel a la vista, cuando llega un pallet de otro dispositivo aparece "Pallet 12 cargado en sistema: Juan Pérez, 24 cajas", y la fila queda marcada **Nuevo** durante 10 minutos. No avisa por los que ya estaban al abrirlo, ni por los cerrados en ese mismo dispositivo, ni con otra pantalla a la vista, para no tapar los avisos de escaneo. Si la pestaña de la PC está en segundo plano, el título cuenta los que llegaron: "(2) Registro de pallets".
 - **Supervisor:** solo el supervisor (o el administrador) ve los botones para cargar, cambiar y borrar productos, el de borrar pallets y el de importar la COOIS. Si otro escanea un código desconocido, la app le dice que se lo pida al supervisor. La base también lo controla, aunque alguien saltee los botones. En modo prueba no hay usuarios y se puede todo.
 - **Órdenes (COOIS):** el supervisor importa cada día la COOIS, el Excel que exporta SAP con las órdenes de producción. **Importar COOIS** abre una ventana para elegir qué columna del archivo es cada dato: número de orden, código interno, descripción, cantidades y fecha. La app deja elegidas las que reconoce por el nombre y recuerda la elección para la próxima vez. Para saber cuánto le falta a cada orden alcanza con la cantidad pendiente, o con la cantidad de la orden y la entregada. Antes de importar muestra cuántas órdenes entran y cuáles quedan afuera: las ya completas, las filas sin número o sin código, y las órdenes repetidas. También avisa los códigos que no están en Productos. Cada COOIS reemplaza a la anterior. Todos ven las órdenes de cada producto, de la más vieja a la más nueva. En **Buscar** se puede escribir una orden o un código, o escanear una caja.
-- **Total por producto:** Historial suma todos los pallets del día por producto, que es lo que se descuenta de las órdenes. El Excel trae la misma tabla en una segunda hoja, **Por producto**. La primera hoja, **Pallets**, sigue con una fila por producto de cada pallet.
+- **Total por producto:** el Panel suma todos los pallets del día por producto, que es lo que se descuenta de las órdenes. El Excel trae la misma tabla en una segunda hoja, **Por producto**. La primera hoja, **Pallets**, sigue con una fila por producto de cada pallet.
 - **Foco:** el campo de la pistola recupera el cursor solo. Si la etiqueta dice en rojo "Tocá acá para volver a leer", la app no es la ventana activa y la pistola estaría escribiendo en otro programa.
-- **Lecturas fuera de lugar:** en Historial, en Órdenes, en Productos o antes de abrir el pallet, una lectura no suma nada. Suena la alerta y un aviso dice que no se contó.
+- **Lecturas fuera de lugar:** en el Panel, en Órdenes, en Productos o antes de abrir el pallet, una lectura no suma nada. Suena la alerta y un aviso dice que no se contó.
 - **Teclado del celular:** ese campo no abre el teclado de pantalla, para que no tape el tablero. Para escribir un código, tocá **Escribir a mano**.
 - **Abrir pallet:** solo se abre tocando el botón, nunca con Enter. El número va de 1 a 9999 y la fecha puede estar hasta 31 días antes o después de hoy. El responsable no acepta 4 cifras seguidas ni un código de producto. Esos controles frenan una lectura que cayó en el campo equivocado.
 - **Productos y envases:** en Productos hay una fila por código de barras. Cada producto puede tener dos: el de la caja contenedora y el de la unidad de venta (U.V), que es la cajita o la bolsa de adentro. Las dos filas comparten el código interno y cada una dice cuántas unidades trae su envase. Un producto no puede tener dos contenedoras ni dos U.V. Si se escribe el código interno en vez de escanear, cuenta la contenedora. Los productos cargados antes de esto son contenedoras.
@@ -167,17 +171,17 @@ La cámara del navegador solo funciona si la página se abre por `https`: desde 
 - **Pallet a medio armar:** queda guardado en el dispositivo a cada lectura. Si se recarga la página o se apaga el celular, sigue ahí.
 - **Dos pestañas:** las dos muestran el mismo pallet y se actualizan solas. Si cambia con una pregunta abierta en la otra pestaña, esa pregunta se cierra sola sin hacer nada.
 - **De un día para el otro:** el formulario de Abrir pallet pasa solo a la fecha nueva, sin borrar lo que ya esté escrito. Una fecha elegida a mano no se toca. Un pallet ya abierto conserva su fecha.
-- **Numeración:** cada fecha arranca en 1. El número se elige al abrir y no se puede repetir en la misma fecha. Si otro dispositivo cerró ese número mientras tanto, el resumen y el aviso muestran con qué número queda. Sin señal, o si dos dispositivos cierran casi al mismo tiempo, pueden quedar dos pallets con el mismo número. Historial los marca en rojo: "Hay otro pallet 3 este día".
+- **Numeración:** cada fecha arranca en 1. El número se elige al abrir y no se puede repetir en la misma fecha. Si otro dispositivo cerró ese número mientras tanto, el resumen y el aviso muestran con qué número queda. Sin señal, o si dos dispositivos cierran casi al mismo tiempo, pueden quedar dos pallets con el mismo número. El Panel los marca en rojo: "Hay otro pallet 3 este día".
 - **Cámara:** en el celular se abre como una pantalla aparte, con el contador, el video, **Deshacer**, **Cerrar cámara** y el modo de carga. En la app de Android, la tecla Atrás también la cierra. Al cerrarla, la pantalla va al resumen del pallet, con la lista de productos y el botón **−1** para corregir antes de cerrarlo. Tiene dos modos, y cada dispositivo recuerda el último que se eligió. No lee códigos QR. Si está buscando un código y no ve ninguno durante 2 segundos, un cartel pide acercar la cámara.
 - **Tocar para leer** (el modo de arranque): cada toque del botón **Leer** cuenta una caja, igual que un gatillazo de la pistola. Después de tocar, la cámara tiene 8 segundos para encontrar un código. Si lo encuentra suena el pitido; si no, avisa en rojo y no suma nada. Sin tocar Leer no cuenta nada, aunque esté viendo un código.
 - **Modo rápido:** la cámara cuenta sola. Otro producto cuenta enseguida, y la misma caja vuelve a contar a los 2 segundos aunque no haya salido de la vista. Por eso un cartel lo avisa todo el tiempo que el modo está activo.
 - **Pistola:** cada lectura suma una caja, aunque sea el mismo código.
-- **Contenedora y U.V:** una caja contenedora suma en Cont. y una de unidad de venta en U.V. Las dos van en la misma fila del producto, con las unidades de cada una. El resumen, el Historial y el Excel las muestran en columnas separadas cuando el pallet tiene alguna U.V.
+- **Contenedora y U.V:** una caja contenedora suma en Cont. y una de unidad de venta en U.V. Las dos van en la misma fila del producto, con las unidades de cada una. El resumen, el Panel y el Excel las muestran en columnas separadas cuando el pallet tiene alguna U.V.
 - **Modo de carga:** abajo de **Usar cámara** se elige **Caja por caja** (cada lectura suma una caja) o **Código + cantidad**. Cada dispositivo recuerda el último que se eligió.
-- **Código + cantidad:** cada lectura no suma: abre la ventana **Cargar cantidad** con el producto y su envase. Ahí se escribe el total de cajas o, para las cajas del medio del pallet, las cajas por fila y la cantidad de filas, hasta 999 cajas. Antes de sumar pregunta, por ejemplo, "¿Confirmás 40 cajas = 24.000 unidades?", y **Corregir** vuelve a la ventana con lo escrito. Con la cámara, en este modo lee sola, porque leer no suma. Esas cajas no se escanearon una por una: si en el medio hay otro producto o falta una caja, la app no se entera. Por eso el resumen, el Historial y el Excel muestran cómo se cargaron, como `8 × 5` (5 filas de 8 cajas) o `40`, para poder volver a controlarlas.
+- **Código + cantidad:** cada lectura no suma: abre la ventana **Cargar cantidad** con el producto y su envase. Ahí se escribe el total de cajas o, para las cajas del medio del pallet, las cajas por fila y la cantidad de filas, hasta 999 cajas. Antes de sumar pregunta, por ejemplo, "¿Confirmás 40 cajas = 24.000 unidades?", y **Corregir** vuelve a la ventana con lo escrito. Con la cámara, en este modo lee sola, porque leer no suma. Esas cajas no se escanearon una por una: si en el medio hay otro producto o falta una caja, la app no se entera. Por eso el resumen, el Panel y el Excel muestran cómo se cargaron, como `8 × 5` (5 filas de 8 cajas) o `40`, para poder volver a controlarlas.
 - **Pallet completo:** cada producto puede tener cargado en Productos cómo se arma un pallet completo, como en la ficha de embalaje: cuántas cajas van en cada fila (la base) y cuántas filas entran. Por ejemplo, 6 cajas por fila y 3 filas son 18 cajas. Van los dos datos o ninguno. Si un pallet se pasa, avisa al sumar, en la lista y en el resumen, sin frenar. En **Cargar cantidad**, las cajas por fila ya vienen puestas y solo hay que escribir las filas; si se escriben más filas de las que entran, avisa. Sin esos datos no avisa nada.
 - **Deshacer último escaneo** saca la última caja leída. Si lo último fue una carga a mano, pregunta y la saca entera. El botón **−1** de cada producto saca la última caja de esa fila, sea contenedora o U.V, aunque no sea la última del pallet. Entre dos toques hay que esperar 0,4 segundos: un toque antes de tiempo no quita nada y suena la alerta.
-- **Pallet cerrado:** no se puede editar. En Historial se puede ver, y el supervisor lo puede borrar entero.
+- **Pallet cerrado:** no se puede editar. En el Panel se puede ver, y el supervisor lo puede borrar entero.
 - **Editar un producto con el pallet abierto:** las cajas ya leídas no cambian. Las nuevas salen en otra fila, y cada fila da bien sus cuentas.
 
 ## Antes de usar datos reales
@@ -185,7 +189,7 @@ La cámara del navegador solo funciona si la página se abre por `https`: desde 
 - `firestore.rules` no deja leer ni escribir nada sin entrar con un usuario. Los usuarios se crean a mano en la consola de Firebase. Con **Habilitar creación (registro)** apagado, como dice el paso 3, nadie puede crearse uno solo.
 - Si la base rechaza un pallet, por ejemplo porque las reglas no se publicaron o el usuario se desactivó, aparece un aviso de error y las cajas vuelven a la pantalla, o vuelven al terminar el pallet que esté abierto. Ese pallet se muestra en rojo y no suma más cajas: hay que cerrarlo de nuevo. En un dispositivo nuevo tampoco cargan los productos, y la app muestra ese mismo motivo. Después de corregir el problema hay que recargar la página.
 - Problema conocido: si un pallet se cierra sin señal, se cierra la pestaña y al volver la señal Firebase rechaza el guardado, ese pallet se pierde sin aviso. Con las reglas publicadas solo pasa si el usuario se desactiva o se borra en ese rato.
-- Salir sin señal: lo que se cerró sin señal todavía no subió. Por eso la pregunta de **Salir** pide esperar a que vuelva la señal.
+- Cambiar de usuario sin señal: lo que se cerró sin señal queda en una cola de quien lo cerró. Si entra otra persona en ese dispositivo, no sube hasta que vuelva a entrar la primera. Por eso **Cambiar de usuario** revisa antes que todo haya subido.
 
 ## Para quien corrija el código
 

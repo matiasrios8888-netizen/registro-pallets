@@ -34,6 +34,7 @@ export const {
   escucharSesion,
   entrar,
   salir,
+  esperarSubida,
   escucharUsuario,
   guardarNombre,
 } = base;

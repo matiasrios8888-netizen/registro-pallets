@@ -250,12 +250,56 @@ a.boton {
   display: none;
 }
 
-.sesion-actual {
-  margin-top: 28px;
+/* Quién entró, arriba de todas las pantallas. El botón es más bajo que los demás para no
+   quitarle lugar al tablero, pero sigue siendo fácil de tocar con guantes. */
+.barra-usuario {
+  display: flex;
+  gap: 8px 14px;
+  align-items: center;
+  justify-content: space-between;
+  margin: -8px 0 12px;
 }
 
-.sesion-actual p {
-  margin-block: 0 10px;
+.barra-usuario p {
+  min-width: 0;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.barra-usuario .boton {
+  flex: none;
+  width: auto;
+  min-height: 52px;
+  padding: 6px 14px;
+  border-bottom-width: 4px;
+  font-size: 22px;
+}
+
+/* Con la cámara abierta en el celular, el video necesita toda la pantalla. */
+@media (max-width: 899px), (max-height: 500px) {
+  .con-camara .barra-usuario {
+    display: none;
+  }
+}
+
+.usuarios-recientes p {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.botones-recientes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.botones-recientes .boton {
+  min-height: 60px;
+  font-size: 24px;
+  overflow-wrap: anywhere;
 }
 
 .ayuda-campo {
@@ -1144,13 +1188,60 @@ select {
   line-height: 1.15;
 }
 
-/* Pantalla Historial */
+/* Pantalla Panel (por dentro, "historial") */
 .resumen {
   margin-block: 14px;
   font-family: var(--letra-angosta);
   font-size: 30px;
   font-weight: 700;
   line-height: 1.15;
+}
+
+/* Los totales del día en números de tablero, como el contador de Escanear. En el celular las
+   unidades van solas abajo: son el número más largo. */
+.contadores-dia {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-block: 16px;
+}
+
+.contador-dia {
+  container-type: inline-size;
+  padding: 10px 14px 12px;
+  border-radius: 10px;
+  background: var(--tablero);
+  color: #fff;
+}
+
+.contador-dia:last-child {
+  grid-column: 1 / -1;
+}
+
+.contador-dia dt {
+  font-family: var(--letra-angosta);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.contador-dia dd {
+  margin: 4px 0 0;
+  color: var(--led);
+  font-family: 'DSEG7', var(--letra-angosta);
+  font-size: clamp(30px, 17cqw, 64px);
+  line-height: 1.1;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (min-width: 601px) {
+  .contadores-dia {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .contador-dia:last-child {
+    grid-column: auto;
+  }
 }
 
 /* Lo que se descuenta de las órdenes: todos los pallets del día sumados por producto. */
@@ -1171,15 +1262,33 @@ select {
   margin-top: 16px;
 }
 
+.columnas-pallets {
+  display: none;
+}
+
 .pallet {
   border-radius: 10px;
   background: var(--chapa);
 }
 
-/* La fila de cada pallet se toca para ver u ocultar su detalle. */
+/* Recién llegado a la base desde otro celular: se marca un rato con el celeste de la empresa,
+   que no se confunde con el verde de "salió bien" ni con el rojo de "error". */
+.pallet-nuevo {
+  box-shadow: inset 6px 0 0 var(--marca-celeste);
+}
+
+/* La fila de cada pallet se toca para ver u ocultar su detalle. En el celular es una tarjeta:
+   número y cajas arriba, quién y unidades abajo, después los productos y el estado. */
 .pallet-cabecera {
   display: grid;
   grid-template-columns: minmax(96px, 1fr) auto;
+  grid-template-areas:
+    'numero cajas'
+    'quien unidades'
+    'productos productos'
+    'estado estado'
+    'repetido repetido'
+    'ver ver';
   gap: 2px 12px;
   align-items: baseline;
   padding: 14px;
@@ -1192,8 +1301,19 @@ select {
   display: none;
 }
 
+.pallet-cabecera h2 { grid-area: numero; }
+.pallet-quien { grid-area: quien; }
+.pallet-productos { grid-area: productos; }
+.pallet-estado { grid-area: estado; }
+.pallet-cajas { grid-area: cajas; }
+.pallet-unidades { grid-area: unidades; }
+
 .pallet-cabecera .dato-suave {
   overflow-wrap: anywhere;
+}
+
+.pallet-hora::before {
+  content: ', a las ';
 }
 
 .pallet-total {
@@ -1203,14 +1323,46 @@ select {
   text-align: right;
 }
 
+.pallet-estado {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.marca {
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-family: var(--letra-angosta);
+  font-size: 19px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.marca-subido {
+  padding-inline: 0;
+  color: var(--tinta-suave);
+  font-weight: 600;
+}
+
+.marca-falta {
+  border: 2px solid var(--tinta-suave);
+  color: var(--tinta);
+}
+
+.marca-nuevo {
+  background: var(--marca-celeste);
+  color: var(--tinta);
+}
+
 .pallet-repetido {
-  grid-column: 1 / -1;
+  grid-area: repetido;
   color: var(--paro);
   font-weight: 700;
 }
 
 .pallet-ver {
-  grid-column: 1 / -1;
+  grid-area: ver;
   font-weight: 600;
   text-decoration: underline;
 }
@@ -1371,6 +1523,11 @@ select {
   background: var(--paro);
 }
 
+.aviso[data-tipo='ok'] {
+  background: var(--marcha);
+  font-weight: 600;
+}
+
 /* Ventanas */
 .dialogo {
   width: min(96vw, 560px);
@@ -1423,13 +1580,118 @@ select {
     bottom: 20px;
   }
 
-  #lista-productos,
-  .lista-pallets {
+  #lista-productos {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
     align-items: start;
     background: none;
+  }
+
+  /* Panel en la PC: la fecha y el Excel en un renglón, y cada pallet es una fila de una tabla. */
+  .panel-controles {
+    display: flex;
+    gap: 16px;
+    align-items: end;
+  }
+
+  .panel-controles .campo {
+    flex: 0 1 320px;
+    margin-block: 0;
+  }
+
+  .panel-controles .boton {
+    flex: 0 1 320px;
+  }
+
+  .columnas-pallets,
+  .pallet-cabecera {
+    --columnas-pallet: 112px 64px minmax(0, 1fr) minmax(0, 1.2fr) 70px 100px 136px 20px;
+  }
+
+  /* El título de la columna ya dice "Cajas" o "Unidades". La palabra queda para quien usa un
+     lector de pantalla, que no lee esos títulos. */
+  .pallet-cabecera .palabra-cifra {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .columnas-pallets {
+    display: grid;
+    grid-template-columns: var(--columnas-pallet);
+    gap: 12px;
+    margin-top: 16px;
+    padding: 0 14px;
+    color: var(--tinta-suave);
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .columnas-pallets .numero {
+    text-align: right;
+  }
+
+  .lista-pallets {
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .pallet-cabecera {
+    grid-template-columns: var(--columnas-pallet);
+    grid-template-areas:
+      'numero hora responsable productos cajas unidades estado ver'
+      'repetido repetido repetido repetido repetido repetido repetido repetido';
+    gap: 0 12px;
+    align-items: center;
+    padding-block: 10px;
+  }
+
+  .pallet-cabecera:hover {
+    background: var(--neutro);
+    border-radius: 10px;
+  }
+
+  .pallet-cabecera h2,
+  .pallet-total {
+    font-size: 26px;
+  }
+
+  .pallet-quien {
+    display: contents;
+  }
+
+  .pallet-responsable { grid-area: responsable; }
+  .pallet-hora { grid-area: hora; }
+
+  .pallet-hora::before {
+    content: none;
+  }
+
+  .pallet-estado {
+    margin-top: 0;
+  }
+
+  .pallet-repetido {
+    margin-top: 4px;
+  }
+
+  .pallet-ver {
+    justify-self: end;
+    text-decoration: none;
+  }
+
+  .pallet-ver::before,
+  .pallet[open] .pallet-ver::before {
+    display: inline-block;
+    content: '▸';
+  }
+
+  .pallet[open] .pallet-ver::before {
+    transform: rotate(90deg);
   }
 
   .fila-producto {
@@ -1438,9 +1700,7 @@ select {
     background: var(--chapa);
   }
 
-  #btn-exportar,
   #pantalla-productos > .boton,
-  #pantalla-historial > .campo,
   #pantalla-productos > .campo,
   #pantalla-ordenes > .boton,
   #pantalla-ordenes > .campo {
@@ -1455,5 +1715,25 @@ select {
   /* La ayuda ocupa el ancho de las dos columnas. */
   .lista-ordenes > .ayuda-coois {
     grid-column: 1 / -1;
+  }
+}
+
+/* En una PC con pantalla ancha, el Panel usa más ancho y el total por producto va al costado,
+   siempre a la vista mientras se recorre la lista de pallets. */
+@media (min-width: 1200px) {
+  main:has(> #pantalla-historial:not([hidden])) {
+    max-width: 1640px;
+  }
+
+  .panel-cuerpo {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 30%);
+    gap: 20px;
+    align-items: start;
+  }
+
+  .panel-cuerpo .totales-dia {
+    position: sticky;
+    top: 16px;
   }
 }

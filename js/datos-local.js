@@ -66,9 +66,14 @@ export async function borrarProducto(id) {
   escribir(CLAVE_PRODUCTOS, leer(CLAVE_PRODUCTOS).filter((p) => p.id !== id));
 }
 
-// Igual que escucharProductos, para los pallets cerrados de una fecha ("2026-11-01").
+// Igual que escucharProductos, para los pallets cerrados de una fecha ("2026-11-01"). Como en
+// Firebase, cada pallet dice si falta subirlo y la lista dice si vino de la base: acá no hay
+// nada que subir, así que nunca falta y siempre viene "de la base".
 export function escucharPallets(fecha, alCambiar) {
-  return escuchar(() => leer(CLAVE_PALLETS).filter((p) => p.fecha === fecha), alCambiar);
+  return escuchar(() => leer(CLAVE_PALLETS).filter((p) => p.fecha === fecha), (lista) => alCambiar(
+    lista.map((p) => ({ ...p, pendiente: false })),
+    true,
+  ));
 }
 
 // Agrega un pallet cerrado con un id nuevo.

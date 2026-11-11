@@ -7,17 +7,27 @@
 // se vuelve a cargar sola en unos segundos.
 import {
   modoPrueba,
+  claveLocal,
   escucharSesion,
   entrar,
   salir,
+  esperarSubida,
   escucharUsuario,
   guardarNombre,
 } from './datos.js';
-import { avisarErrorDeDatos, confirmar } from './ui.js';
+import { avisar, avisarErrorDeDatos, cajas, confirmar, crear } from './ui.js';
 
 // Los usuarios no necesitan un mail real: en Firebase se crean como juan@pallets.local, y para
 // entrar alcanza con escribir "juan". Un correo completo también sirve.
 const DOMINIO_DE_USUARIOS = 'pallets.local';
+
+// Los últimos que entraron en este dispositivo, para elegirlos con un toque: [{ usuario, nombre }].
+// Nunca se guarda la contraseña.
+const CLAVE_RECIENTES = claveLocal('usuarios-recientes');
+const MAXIMO_DE_RECIENTES = 6;
+
+// Cuánto espera a que suba lo pendiente antes de avisar que falta subir algo.
+const ESPERA_PARA_SUBIR_MS = 3000;
 
 // Quien entró. En modo prueba no hay nadie, con permiso para todo.
 export const usuario = { uid: null, nombre: '', rol: modoPrueba ? 'supervisor' : '' };
@@ -39,11 +49,57 @@ const mensajeIngreso = document.getElementById('mensaje-ingreso');
 const botonEntrar = document.getElementById('btn-entrar');
 const formularioNombre = document.getElementById('form-nombre');
 const campoNombre = document.getElementById('ingreso-nombre');
+const recientes = document.getElementById('usuarios-recientes');
+const botonesRecientes = document.getElementById('botones-recientes');
+const botonCambiarUsuario = document.getElementById('btn-cambiar-usuario');
 
 const correoDe = (texto) => {
   const limpio = texto.trim().toLowerCase();
   return limpio.includes('@') ? limpio : `${limpio}@${DOMINIO_DE_USUARIOS}`;
 };
+
+// Lo contrario: de "juan@pallets.local" a "juan", que es lo que se escribe para entrar.
+const usuarioDe = (correo) => correo.replace(new RegExp(`@${DOMINIO_DE_USUARIOS.replace('.', '\\.')}$`), '');
+
+function leerRecientes() {
+  try {
+    const lista = JSON.parse(localStorage.getItem(CLAVE_RECIENTES) ?? '[]');
+    return Array.isArray(lista) ? lista.filter((r) => typeof r?.usuario === 'string' && r.usuario) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Pone a quien acaba de entrar primero en la lista de recientes.
+function recordarUsuario(nombreDeUsuario, nombre) {
+  if (!nombreDeUsuario) return;
+  const lista = [{ usuario: nombreDeUsuario, nombre }, ...leerRecientes().filter((r) => r.usuario !== nombreDeUsuario)];
+  localStorage.setItem(CLAVE_RECIENTES, JSON.stringify(lista.slice(0, MAXIMO_DE_RECIENTES)));
+}
+
+// Un botón por cada uno de los últimos que entraron. Tocarlo completa el usuario y deja el
+// cursor en la contraseña.
+function pintarRecientes() {
+  const lista = leerRecientes();
+  recientes.hidden = lista.length === 0;
+  botonesRecientes.replaceChildren(...lista.map(({ usuario: nombreDeUsuario, nombre }) => crear('button', {
+    type: 'button',
+    class: 'boton boton-secundario',
+    alHacerClic: () => {
+      campoUsuario.value = nombreDeUsuario;
+      mensajeIngreso.hidden = true;
+      campoContrasena.focus();
+    },
+  }, nombre || nombreDeUsuario)));
+}
+
+// app.js conecta estas dos funciones de la pantalla Escanear: este archivo no puede importarlas,
+// porque pantalla-escaneo.js ya importa este. palletAbierto devuelve { numero, cajas } o null.
+let palletAbierto = () => null;
+let irAlPallet = () => {};
+export function conectarConEscaneo(funciones) {
+  ({ palletAbierto, irAlPallet } = funciones);
+}
 
 // Traduce el error de Firebase a algo que se entienda.
 function motivoDelIngreso(error) {
@@ -67,6 +123,7 @@ function mostrarIngreso(formulario) {
   });
   formularioIngreso.hidden = formulario !== formularioIngreso;
   formularioNombre.hidden = formulario !== formularioNombre;
+  if (formulario === formularioIngreso) pintarRecientes();
   formulario.querySelector('input').focus();
 }
 
@@ -93,26 +150,55 @@ function enviarNombre(evento) {
   guardarNombre(usuario.uid, nombre).catch(avisarErrorDeDatos);
 }
 
-// Pregunta antes de salir: volver a entrar pide usuario, contraseña e internet.
-async function preguntarSiSale() {
-  const sale = await confirmar({
-    titulo: '¿Salir?',
-    detalle: 'Para volver a entrar hacen falta tu usuario, tu contraseña e internet. Si cerraste pallets sin señal, salí recién cuando vuelva la señal.',
-    si: 'Salir',
-  });
+// Sale para que entre otra persona. Antes revisa dos cosas:
+// - Que no haya un pallet abierto: quedaría a nombre de quien sale y lo cerraría otro.
+// - Que haya subido todo lo cerrado sin señal: lo que falta subir queda en la cola de quien lo
+//   cerró, y con otra persona adentro no sube.
+async function cambiarDeUsuario() {
+  const abierto = palletAbierto();
+  if (abierto) {
+    const ir = await confirmar({
+      titulo: `Tenés abierto el pallet ${abierto.numero}`,
+      detalle: `${abierto.cajas > 0 ? `Tiene ${cajas(abierto.cajas)}.` : 'Todavía no tiene cajas.'} Cerralo o descartalo antes de cambiar de usuario, así no queda a nombre de otra persona.`,
+      si: 'Ir al pallet',
+    });
+    if (ir) irAlPallet();
+    return;
+  }
+
+  botonCambiarUsuario.disabled = true;
+  // Con señal termina enseguida. Sin señal tarda unos segundos: que se vea que está haciendo algo.
+  const aviso = setTimeout(() => avisar('Revisando que todo esté subido…'), 300);
+  const subioTodo = await esperarSubida(ESPERA_PARA_SUBIR_MS);
+  clearTimeout(aviso);
+  botonCambiarUsuario.disabled = false;
+
+  const sale = subioTodo
+    ? await confirmar({
+      titulo: '¿Cambiar de usuario?',
+      detalle: 'Para volver a entrar hacen falta el usuario, la contraseña e internet.',
+      si: 'Cambiar de usuario',
+    })
+    : await confirmar({
+      titulo: 'Falta subir lo que cerraste sin señal',
+      detalle: `Si salís ahora, se sube recién cuando ${usuario.nombre} vuelva a entrar en este celular. Mejor esperá a tener señal y probá de nuevo.`,
+      si: 'Salir igual',
+      no: 'Esperar',
+      peligro: true,
+    });
   if (!sale) return;
   await salir();
   // Volver a cargar deja la app como recién abierta, sin nada del usuario anterior.
   window.location.reload();
 }
 
-// Muestra quién entró al final de Productos, con el botón para salir.
+// Muestra quién entró en la barra de arriba, con el botón para cambiar de usuario.
 function mostrarUsuarioActual() {
-  document.getElementById('sesion-actual').hidden = false;
+  document.getElementById('barra-usuario').hidden = false;
   document.getElementById('sesion-nombre').textContent = esSupervisor()
     ? `Entraste como ${usuario.nombre}, ${usuario.rol}.`
     : `Entraste como ${usuario.nombre}.`;
-  document.getElementById('btn-salir').addEventListener('click', preguntarSiSale);
+  botonCambiarUsuario.addEventListener('click', cambiarDeUsuario);
 }
 
 // Espera a que alguien haya entrado y tenga nombre. En modo prueba termina enseguida.
@@ -152,6 +238,7 @@ export function iniciarSesion() {
         yaEntro = true;
         usuario.nombre = datos.nombre;
         usuario.rol = rolLimpio(datos.rol);
+        recordarUsuario(usuarioDe(cuenta.correo), datos.nombre);
         // Vuelve a la pantalla de arranque, la de Escanear.
         document.body.classList.remove('sin-sesion');
         pantallaIngreso.hidden = true;
